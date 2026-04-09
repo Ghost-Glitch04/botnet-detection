@@ -1,0 +1,66 @@
+# ================================================================
+# IOC Template — Network Forensics Toolkit
+# ================================================================
+#
+# This file is a blank template. Copy it to a new file for your
+# engagement (e.g. iocs/acme_2026-04.txt) and populate with
+# indicators. Engagement-specific IOC files are gitignored by
+# default — only this template ships in the repo.
+#
+# ----------------------------------------------------------------
+# FORMAT
+# ----------------------------------------------------------------
+# - One indicator per line.
+# - Blank lines are ignored.
+# - Lines beginning with "#" are comments (ignored by loader).
+# - Leading/trailing whitespace is stripped.
+# - Indicators are matched case-insensitively.
+# - No inline comments — "1.2.3.4  # bad guy" will NOT strip the
+#   comment; put the comment on its own line above the indicator.
+#
+# ----------------------------------------------------------------
+# SUPPORTED INDICATOR TYPES
+# ----------------------------------------------------------------
+# The triage module auto-detects type by pattern:
+#
+#   IPv4          192.0.2.15
+#   IPv4 CIDR     192.0.2.0/24
+#   IPv6          2001:db8::1
+#   Domain        evil.example.com
+#   URL           https://evil.example.com/beacon
+#   MD5           d41d8cd98f00b204e9800998ecf8427e
+#   SHA1          da39a3ee5e6b4b0d3255bfef95601890afd80709
+#   SHA256        e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+#
+# ----------------------------------------------------------------
+# WHERE THESE ARE CROSS-REFERENCED BY Invoke-BotnetTriage
+# ----------------------------------------------------------------
+#   IPs / CIDRs   → TCP connection remote addresses, DNS cache resolved IPs
+#   Domains       → DNS cache entries, hosts file entries
+#   URLs          → scheduled task / service command lines
+#   Hashes        → (Phase 2 — not used by Invoke-BotnetTriage)
+#
+# An IOC match acts as a score multiplier on findings, not as a
+# standalone finding — the triage module flags suspicious state
+# regardless of IOCs, and matching IOCs amplify the score.
+#
+# ----------------------------------------------------------------
+# EXAMPLES (delete these before shipping a real IOC file)
+# ----------------------------------------------------------------
+
+# --- IPs observed in prior incident ---
+# 192.0.2.15
+# 198.51.100.77
+
+# --- CIDR ranges (hosting providers known bad in this engagement) ---
+# 203.0.113.0/24
+
+# --- C2 domains ---
+# evil.example.com
+# command.badguy.tld
+
+# --- Dropper URLs ---
+# https://evil.example.com/loader.ps1
+
+# --- Sample hashes (Phase 2) ---
+# d41d8cd98f00b204e9800998ecf8427e

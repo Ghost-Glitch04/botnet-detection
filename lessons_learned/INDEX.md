@@ -7,10 +7,18 @@
 
 ## Quick Reference — AI Subject Files
 
+See [ai/_overview.md](ai/_overview.md) for the full file inventory and concern maps.
+
 | File | Rules | Topics / Keywords |
 |------|-------|-------------------|
+| [ai/powershell.md](ai/powershell.md) | 21 | strict-mode, scoping, dot-source, standalone-fallback, CIM/WMI perf, phase-gate error handling, library shape, bootstrap, AST parsing, bash interop |
+| [ai/docs.md](ai/docs.md) | 17 | link checking, surgical Edit, plan-vs-file reconciliation, strategic-vs-tactical scoping, template semantics, operator experience |
+| [ai/process.md](ai/process.md) | 7 | Glob sweep, validate-at-write, prior-phase re-verification, Windows tooling, .gitkeep vs README |
+| [ai/config.md](ai/config.md) | 6 | per-module ownership, in-file Description, .env contract timing, sync obligations |
+| [ai/testing.md](ai/testing.md) | 7 | multi-tier non-redundancy, mock realism, AST parse-check, fresh pwsh child, fixture privacy |
+| [ai/heuristics.md](ai/heuristics.md) | 5 | false-positive ceiling, dead-flag, threshold/floor math, cross-stage data-flow, fallback concentration |
 
-*(populated as AI files are created)*
+**Concern maps** (cross-file rule clusters): `standalone-fallback`, `verify-at-write-time`, `plan-vs-truth reconciliation` — see [ai/_overview.md](ai/_overview.md#concern-maps).
 
 ## Tag Vocabulary
 
@@ -45,6 +53,60 @@ note it in the current phase file.
 | config,git,verification | "Already done" prior-phase files need re-verification if the current step depends on a specific property of them | phase03_config_files.md#3 | pitfall |
 | config,docs | Prefer in-file `Description` fields over sidecar docs for config files — travels with the file, survives tool transformations | phase03_config_files.md#4 | design |
 | config,docs,planning | Tactical-extends-strategic is legitimate but creates a sync obligation — either keep in lockstep or explicitly label the divergence | phase03_config_files.md#5 | design |
+| process,docs,verification | When two planning docs disagree about a file's contents, read the committed file — ground truth beats both plans | phase04_iocs_template.md#1 | went-well |
+| docs,ioc,design | Template files should document *semantics* (how the file is consumed, what a match means), not just *syntax* — prevents misuse, not just typos | phase04_iocs_template.md#2 | went-well |
+| docs,git,planning | A "final" labeled block in a planning doc can still be incomplete — diff it against the committed file before trusting either | phase04_iocs_template.md#3 | pitfall |
+| docs,planning | Co-located README + centralized cheatsheet can both exist, but name a single source of truth for shared content | phase04_iocs_template.md#4 | design |
+| powershell,process,verification | Parser validation + dot-source smoke test exclude a bug class; "zero bugs found" is meaningful signal, not wasted effort | phase05_shared_helpers.md#1 | went-well |
+| powershell,testing,security | For any helper with hand-rolled matching or string manipulation, write a 10-line smoke test with positive AND negative cases | phase05_shared_helpers.md#2 | went-well |
+| powershell,bash,tools | Never cram multi-line pwsh into bash-quoted `pwsh -Command "..."` — bash eats backticks and `$()` regardless of `$` escaping; use a tempfile + `-File` | phase05_shared_helpers.md#3 | went-well |
+| powershell,docs,standards | Helper library headers should name caller-scope state the helper reads (`Depends:` line), not just parameters — implicit deps are invisible | phase05_shared_helpers.md#4 | went-well |
+| powershell,security,testing,masking | Substring-match sensitivity detectors must match at camelCase segment boundaries — `pat`/`sas`/`pwd` false-positive inside `InputPath`/`Assessed`/`ForwardTo` | phase05_shared_helpers.md#1pitfall | pitfall |
+| powershell,scoping,library | Dot-sourced library files must not set script-scope state (`Set-StrictMode`, `$ErrorActionPreference`, `param` blocks) — those are the caller's prerogatives | phase05_shared_helpers.md#5 | design |
+| powershell,logging,standalone-fallback | Helpers destined for standalone-paste toolkits must degrade gracefully when usual caller-scope state is absent (e.g. `$script:LogFile` unset) | phase05_shared_helpers.md#6 | design |
+| powershell,stubs,fail-loud | "Fail loud" ≠ "fail closed" — library stubs should WARN-and-return-null, not throw, so one stub call doesn't brick the whole dot-source | phase05_shared_helpers.md#7 | design |
+| powershell,scoping,phase-gate | Helpers in dot-sourced libraries must NOT call `exit` — throw a tagged terminating error and let the caller decide function-return vs script-exit | phase06_invoke_triage_build.md#1 | pitfall |
+| powershell,testing,smoke-test | Bracket function smoke tests with `=== START ===` / `=== END (rc=$rc) ===` trailers — missing trailer is a precise tell that the function exited via an unexpected path | phase06_invoke_triage_build.md#1 | went-well |
+| powershell,performance,cim,wmi | Per-row Get-CimInstance inside foreach is a perf bug — build one snapshot at phase start, hashtable-index by primary key, look up inside the loop | phase06_invoke_triage_build.md#2 | pitfall |
+| powershell,logging,observability | Always include stopwatch duration in `UNIT_END` log lines — slow units name themselves; without it, "feels slow" takes hours to localize | phase06_invoke_triage_build.md#2 | went-well |
+| security,heuristics,false-positive | Any suspicion-detector that fires on >10% of its input is broken — corpus-check heuristics against a clean baseline before ship | phase06_invoke_triage_build.md#3 | pitfall |
+| security,heuristics,scoring | Flags that aren't in the weights file are dead code with negative value — they consume operator attention without influencing the verdict; delete the emit code | phase06_invoke_triage_build.md#3 | pitfall |
+| powershell,error-handling,phase-gate | Two-arm catch (gate-signal → return 0, anything-else → return 99) is clearer than separate trys when a function has both early-exit-success and panic paths | phase06_invoke_triage_build.md#1design | design |
+| powershell,standalone-fallback,helpers | Capability detection (`Get-Command -ErrorAction SilentlyContinue`) is more robust than caller-set flags for "should I provide a fallback?" decisions | phase06_invoke_triage_build.md#2design | design |
+| powershell,module-shape,libraries | Modules whose entry point is a single named function should ship that function and stop — no "if invoked as script, run it" footer; conflates definition and invocation | phase06_invoke_triage_build.md#3design | design |
+| powershell,strict-mode,scalar-vs-array | Under `Set-StrictMode -Version Latest`, ALWAYS wrap `Get-ChildItem` (and any cmdlet that may return 0/1/N) in `@(...)` — `.Count` on a single FileInfo throws | phase07_deploy_launcher.md#1 | pitfall |
+| powershell,scoping,dot-source | Dot-source operations (`.`) cannot be wrapped in a function — definitions die when the function returns; lift dot-source to script scope | phase07_deploy_launcher.md#2 | pitfall |
+| powershell,announce,filtering | Use AST parsing to enumerate "what this codebase contributes" — never use `Get-Command -Name 'Invoke-*'`; PSModulePath pollution makes blocklists unbounded | phase07_deploy_launcher.md#3 | pitfall |
+| powershell,bootstrap,logging | Inline a minimal `Write-Log` at top of a launcher — function shadowing makes the handoff to the authoritative version transparent if signatures + script-scope vars match | phase07_deploy_launcher.md#1went | went-well |
+| powershell,bootstrap,error-handling | Distinguish critical (exit) vs non-critical (warn+continue) units via a wrapper switch — bake the rule into the API, don't scatter try/catch | phase07_deploy_launcher.md#3went | went-well |
+| powershell,bootstrap,ordering | When a plan's nominal step order has a mechanical dependency (logfile needs OutputDir to exist), reshuffle and document the divergence inline at the divergence | phase07_deploy_launcher.md#1design | design |
+| architecture,fallback | Don't add fallback modes to every file — identify the canonical "no-launcher" path and concentrate fallback complexity there; some files ARE the fallback | phase07_deploy_launcher.md#2design | design |
+| testing,verification,multi-tier | Each verification tier must exclude a different bug class — skipping any tier silently allows that class to ship (Tier 2 passed; Tier 2a found broken IOC correlation) | phase08_verification_tiers.md#1 | went-well |
+| testing,ioc,verification | Mock IOC files must contain real entries from the test host — synthetic IOCs that match nothing yield a vacuous pass | phase08_verification_tiers.md#2 | went-well |
+| testing,powershell,verification | AST parse-check before re-running a tier — sub-100ms vs 13s+ per real-run cycle; cheapest possible regression test on every edit | phase08_verification_tiers.md#3 | went-well |
+| testing,standalone-fallback,verification | Helper-stub guards (`if -not Get-Command`) make stubs invisible in normal load path — only standalone-paste exercises stub bodies | phase08_verification_tiers.md#4 | went-well |
+| powershell,strict-mode,cim,wmi | CIM polymorphism: heterogeneous collections (`Actions`, `Triggers`) need `PSObject.Properties.Name -contains` probing — direct property access throws under StrictMode on non-default subtypes | phase08_verification_tiers.md#1pitfall | pitfall |
+| architecture,data-flow,ioc | Cross-stage filter that's correct in isolation can be wrong in pipeline — test the pipeline end-to-end with data only visible via the cross-stage path | phase08_verification_tiers.md#2pitfall | pitfall |
+| heuristics,scoring,ioc | Thresholds and floors must be checked against each other — a 10×2.0=20 IOC-only floor lands in Low when Medium threshold is 25; lurks until pipeline test | phase08_verification_tiers.md#3pitfall | pitfall |
+| standalone-fallback,powershell,verification | If standalone-paste is load-bearing, the standalone-paste tier is non-optional — every change to the function body that may add a helper call must re-run it | phase08_verification_tiers.md#4pitfall | pitfall |
+| powershell,scoping,defensive | Inline helper stubs in paste-target files: use `Get-Variable -Scope 1` for caller-param lookup, not implicit dynamic scoping — paste session strict-mode state is unknowable | phase08_verification_tiers.md#1design | design |
+| testing,git,privacy | Test fixtures (mock IOCs, smoke-test scripts) belong in unconditionally-ignored dirs (`output/`), not partially-ignored dirs (`iocs/`) — defends against future .gitignore edits | phase08_verification_tiers.md#2design | design |
+| testing,standalone-fallback,isolation | Standalone-paste tier must spawn a literal fresh `pwsh -NoProfile` child — runspaces inherit `$env:PSModulePath` and silently mask missing-stub bugs | phase08_verification_tiers.md#3design | design |
+| docs,verification,powershell | Markdown link-checking belongs in the same step as writing the file — extract `\]\(([^)]+)\)`, filter internal, Test-Path each | phase09_readme_expansion.md#1 | went-well |
+| docs,planning,scoping | Module/feature tables must distinguish *shipped* from *planned* in the same column — separate "status" lines get skimmed past | phase09_readme_expansion.md#2 | went-well |
+| docs,deployment,operator-experience | When multiple deployment paths are meaningfully different, document them as parallel siblings (Path A/B/C), not primary + footnotes | phase09_readme_expansion.md#3 | went-well |
+| docs,planning,ephemeral-context | Bug-specific troubleshooting entries have a half-life — schedule a prune or move to CHANGELOG before they accumulate | phase09_readme_expansion.md#1pitfall | pitfall |
+| docs,planning,coupling | Public docs that link to scheduled-for-reorg internal artifacts must capture the dependency in a CF before the reorg starts | phase09_readme_expansion.md#2pitfall | pitfall |
+| docs,security,deployment | Standalone-paste path documents *paste*, not `iwr \| iex` — `iwr \| iex` to a security tool from GitHub looks identical to a malicious dropper to EDR | phase09_readme_expansion.md#2design | design |
+| docs,planning,scoping | Don't pre-extract reference documentation until it has at least two consumers — one module's reference belongs in README; two earn their own file | phase09_readme_expansion.md#3design | design |
+| process,lessons-learned,scoping | When organizing accumulated rules, count the primary tag first — `≥3 rules earns a file` is a real cliff; below it sits in INDEX, above it earns a file | phase10_lessons_finalize.md#1 | went-well |
+| process,lessons-learned,coupling | Carry-forwards exist to be consulted *before action*, not just appended *after* — re-read open CFs at phase start, not just retrospective | phase10_lessons_finalize.md#2 | went-well |
+| docs,verification,powershell | When a verification idiom has worked in 3+ phases, promote it from per-phase tactical to cross-phase reflex — fixed cost vs growing-cost-of-not-running | phase10_lessons_finalize.md#3 | went-well |
+| process,lessons-learned,scoping | Tag the primary slot with the topic the rule *teaches*, not the technology it *uses* — `heuristics,powershell` not `powershell,heuristics` | phase10_lessons_finalize.md#1pitfall | pitfall |
+| lessons-learned,planning | AI-file rule counts that aggregate cross-references can overcount — graduation passes should recount with deduplication | phase10_lessons_finalize.md#2pitfall | pitfall |
+| lessons-learned,docs | AI subject files use terse When/Rule template (not narrative) + `*Source:*` line as bridge — narrative lives in phase files, AI files are pure rules | phase10_lessons_finalize.md#1design | design |
+| lessons-learned,scoping | Concern maps live inline in `_overview.md` (not separate files) until ~5 entries each — keeps single entry point flat | phase10_lessons_finalize.md#2design | design |
+| lessons-learned,coupling,planning | Foundation graduation is a phase-boundary activity, not a phase-finalization activity — defer until next phase transition | phase10_lessons_finalize.md#3design | design |
 
 ## Foundation
 
