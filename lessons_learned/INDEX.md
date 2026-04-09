@@ -13,10 +13,10 @@ See [ai/_overview.md](ai/_overview.md) for the full file inventory and concern m
 |------|-------|-------------------|
 | [ai/powershell.md](ai/powershell.md) | 21 | strict-mode, scoping, dot-source, standalone-fallback, CIM/WMI perf, phase-gate error handling, library shape, bootstrap, AST parsing, bash interop |
 | [ai/docs.md](ai/docs.md) | 17 | link checking, surgical Edit, plan-vs-file reconciliation, strategic-vs-tactical scoping, template semantics, operator experience |
-| [ai/process.md](ai/process.md) | 17 | Glob sweep, validate-at-write, prior-phase re-verification, Windows tooling, .gitkeep vs README, diagnostic playbook (13-step), bug-fix reflection rules |
+| [ai/process.md](ai/process.md) | 19 | Glob sweep, validate-at-write, prior-phase re-verification, Windows tooling, .gitkeep vs README, diagnostic playbook (13-step), bug-fix reflection rules, peer-code as learning vector, CF premise discipline |
 | [ai/config.md](ai/config.md) | 6 | per-module ownership, in-file Description, .env contract timing, sync obligations |
 | [ai/testing.md](ai/testing.md) | 7 | multi-tier non-redundancy, mock realism, AST parse-check, fresh pwsh child, fixture privacy |
-| [ai/heuristics.md](ai/heuristics.md) | 5 | false-positive ceiling, dead-flag, threshold/floor math, cross-stage data-flow, fallback concentration |
+| [ai/heuristics.md](ai/heuristics.md) | 9 | false-positive ceiling, dead-flag, threshold/floor math, cross-stage data-flow, fallback concentration, enrichment channel selection (DNS over HTTPS), allowlist-vs-blocklist, fallback semantics, operational footprint |
 
 **Concern maps** (cross-file rule clusters): `standalone-fallback`, `verify-at-write-time`, `plan-vs-truth reconciliation` — see [ai/_overview.md](ai/_overview.md#concern-maps).
 
@@ -25,7 +25,8 @@ See [ai/_overview.md](ai/_overview.md) for the full file inventory and concern m
 ```
 powershell, forensics, botnet, triage, beacon, ioc, config, secrets,
 error-handling, logging, testing, security, git, deploy, network,
-process, remote-shell, standalone-fallback, scaffolding, docs
+process, remote-shell, standalone-fallback, scaffolding, docs,
+enrichment, asn, dns, external-knowledge, operational-footprint
 ```
 
 Tags are lowercase, hyphenated compounds, 1–3 per entry with primary tag first.
@@ -129,6 +130,12 @@ note it in the current phase file.
 | lessons-learned,process | Bug-fix reflections must answer "what would have caught this?" -- if the answer is "none of our tests," that is a CF, not a footnote | phase12_diagnostic_playbook.md#step13 | went-well |
 | heuristics,scoring,false-positive | When detector top-N is dominated by identical findings on a clean baseline, fix the detector (allowlist) rather than the display (top-N dedup) -- dedup hides noise behind cosmetics | phase12_diagnostic_playbook.md#finding2 | pitfall |
 | lessons-learned,docs | Diagnostic playbooks captured as numbered steps (not bullets) -- the order encodes a dependency graph that prose flattens away | phase12_diagnostic_playbook.md#2design | design |
+| enrichment,network,dns | Prefer protocols the endpoint already needs (DNS, NTP) over protocols the perimeter may block (HTTPS to third-party API) -- Cymru DNS TXT for ASN lookup is the canonical example | phase13_external_pattern_borrow.md#finding1 | design |
+| heuristics,enrichment,asn | Allowlist the small finite normal set (legitimate ASNs ~10-20) and surface everything else; blocklists of bad IPs decay daily, allowlists of legitimate operators decay over years | phase13_external_pattern_borrow.md#finding2 | design |
+| heuristics,enrichment | Document fallback semantics -- distinguish degraded answer (same question, less precision) from different answer (related question, full precision); /24 vs BGP /20 is the latter | phase13_external_pattern_borrow.md#finding3 | design |
+| enrichment,operational-footprint,security | A detection tool's enrichment lookups are part of the tool's observable footprint *on the target* -- document them, provide a `-NoNetworkLookups` kill-switch, make stealth-vs-quality the operator's choice | phase13_external_pattern_borrow.md#finding4 | design |
+| process,external-knowledge,lessons-learned | Read peer code from adjacent forensics/security domains for techniques even when use cases differ -- trade knowledge is invisible to general docs but visible in working code from practitioners | phase13_external_pattern_borrow.md#finding5 | went-well |
+| process,lessons-learned,planning | Carry-forwards must record their *premise*, not just their deferral -- "Phase 2 because needs offline DB" is reviewable; "Phase 2" is opaque and outlives its premise silently | phase13_external_pattern_borrow.md#finding6 | pitfall |
 
 ## Foundation
 

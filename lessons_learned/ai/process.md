@@ -88,6 +88,24 @@ Rules for *how* to work, not *what* to build. Anchor topics: verify-before-write
 
 ---
 
+### Read peer code from adjacent forensics/security domains for techniques, not for use cases
+
+**When:** The operator (or a colleague) shares code from a related forensics, IR, or security tool — even if it's a different language, different artifact type, or different problem.
+**Rule:** Read it for *techniques*, not for use cases. Trade knowledge — Team Cymru DNS lookups, sigcheck signer extraction, PE-header beaconing patterns — is invisible to general documentation but visible in working code from practitioners. The technique usually ports across language and use case even when the surrounding code does not. Cost: 5 minutes to read 200 lines of peer code. Value: months of avoided wrong-direction work when the technique collapses a previously-deferred phase boundary. When uncertain whether the script will help, default to reading it.
+
+*Source: phase13_external_pattern_borrow.md#finding5*
+
+---
+
+### Carry-forwards must record their premise, not just their deferral
+
+**When:** Writing a Carry-Forward (CF) entry that defers work to a future phase or release.
+**Rule:** Write the *premise* of the deferral, not just the deferral. "Deferred to Phase 2 *because* requires offline DB" is reviewable; "Deferred to Phase 2" is opaque and outlives its premise silently. On every phase boundary, walk open CFs and re-test each premise against current knowledge — premises decay (a peer script may eliminate the offline DB requirement), and a CF whose premise has fallen should be promoted into the active plan immediately, not on its original schedule. Symptom you missed this: a CF you wrote months ago that turns out to be trivially solvable today.
+
+*Source: phase13_external_pattern_borrow.md#finding6*
+
+---
+
 ## Diagnostic Playbook
 
 Generalized debugging steps from phase12. Apply in order when triaging an unfamiliar failure. Steps 8 and 11 (encoding-specific tooling, parser/JSON validators) live in [powershell.md](powershell.md) and [config.md](config.md) respectively.
