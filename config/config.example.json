@@ -1,0 +1,14 @@
+{
+    "Description": "Global ops defaults for the Network Forensics Toolkit. Copy to config.local.json (gitignored) to override per engagement; local values win over example values during merge.",
+    "DefaultSamples": 5,
+    "DefaultIntervalSeconds": 15,
+    "DefaultOutputDir": "output",
+    "ApiRateLimitSeconds": {
+        "VirusTotal": 15,
+        "AbuseIPDB": 1,
+        "Scamalytics": 2
+    },
+    "PartialSuccessFailureThreshold": 0.25,
+    "RetryAttempts": 3,
+    "RetryInitialDelayMs": 1000
+}

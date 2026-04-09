@@ -1,0 +1,46 @@
+{
+    "Description": "Known-good processes, ports, subnets, signers, and beacon whitelists to exclude from analysis. Tune per engagement.",
+    "Processes": [
+        "SentinelAgent",
+        "SentinelServiceHost",
+        "SentinelStaticEngine",
+        "SentinelRemoteShellHost",
+        "N-AbleAgent",
+        "BASupSrvc",
+        "BASupApp",
+        "SophosFS",
+        "SophosAgent",
+        "SophosCleanM",
+        "SophosFileScanner",
+        "MsMpEng"
+    ],
+    "Ports": [
+        7680
+    ],
+    "LocalOnlyPorts": [
+        135,
+        139,
+        445,
+        5355,
+        5357
+    ],
+    "PrivateSubnets": [
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16"
+    ],
+    "TrustedSigners": [
+        "Microsoft Corporation",
+        "Microsoft Windows",
+        "SentinelOne, Inc.",
+        "Sophos Ltd",
+        "N-able Technologies, Inc."
+    ],
+    "BeaconWhitelist": [
+        {
+            "Process": "svchost",
+            "RemotePort": 443,
+            "Reason": "Windows Update"
+        }
+    ]
+}

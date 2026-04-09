@@ -1,0 +1,137 @@
+# ──────────────────────────────────────────────────────────────
+# Secrets & local config — MUST be first
+# ──────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+config/config.local.json
+config/*.local.json
+config/secrets.json
+config/*.secret.json
+
+# Generic credential/key files
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+*.cer
+*.der
+*.jks
+*.keystore
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+*.ppk
+known_hosts
+authorized_keys
+credentials
+credentials.json
+*.credentials
+
+# ──────────────────────────────────────────────────────────────
+# Claude Code / IDE agent state — may contain absolute paths,
+# tool allow-lists, and session history tied to the author's machine
+# ──────────────────────────────────────────────────────────────
+.claude/settings.local.json
+.claude/.credentials*
+.claude/sessions/
+.claude/shell-snapshots/
+.claude/telemetry/
+.claude/file-history/
+.claude/projects/
+.claude/backups/
+.claude/ide/
+.claude/plans/
+
+# ──────────────────────────────────────────────────────────────
+# Runtime output — engagement data, never committed
+# ──────────────────────────────────────────────────────────────
+output/*
+!output/.gitkeep
+
+*.log
+*.b64.txt
+*.evtx
+*.etl
+*.pcap
+*.pcapng
+*.cab
+*.zip
+*.7z
+*.tar
+*.tar.gz
+*.tgz
+
+# Module-specific default output locations (fallbacks)
+BotnetForensics/
+ForensicsOutput/
+
+# ──────────────────────────────────────────────────────────────
+# IOC files — contain engagement-specific indicators and
+# potentially client-identifying context. Only the template ships.
+# ──────────────────────────────────────────────────────────────
+iocs/*
+!iocs/.gitkeep
+!iocs/iocs_template.txt
+!iocs/README.md
+
+# ──────────────────────────────────────────────────────────────
+# Lessons learned — private/engagement-tagged notes stay local
+# ──────────────────────────────────────────────────────────────
+lessons_learned/private_*.md
+lessons_learned/**/private_*.md
+lessons_learned/engagement_*.md
+
+# ──────────────────────────────────────────────────────────────
+# PowerShell artifacts
+# ──────────────────────────────────────────────────────────────
+*.ps1xml.bak
+*.psd1.bak
+*.psm1.bak
+PSScriptAnalyzerSettings.local.psd1
+
+# ──────────────────────────────────────────────────────────────
+# Test / scratch / temp files that commonly pick up real data
+# ──────────────────────────────────────────────────────────────
+scratch/
+tmp/
+temp/
+*.scratch.*
+*.tmp
+*.bak
+*.old
+*.orig
+*.swp
+*.swo
+*~
+
+# ──────────────────────────────────────────────────────────────
+# Editor / IDE
+# ──────────────────────────────────────────────────────────────
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.shared.json
+.idea/
+*.sublime-workspace
+*.sublime-project
+.history/
+
+# ──────────────────────────────────────────────────────────────
+# OS artifacts
+# ──────────────────────────────────────────────────────────────
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+desktop.ini
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+$RECYCLE.BIN/
+System Volume Information/

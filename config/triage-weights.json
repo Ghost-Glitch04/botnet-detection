@@ -1,0 +1,42 @@
+{
+    "Description": "Risk scoring weights for Invoke-BotnetTriage (Phase 1 — wide-shallow triage module). Tune per engagement. Thresholds map numeric scores to High/Medium/Low verdicts.",
+    "Connections": {
+        "PrivateToPublicNonBrowser": 25,
+        "ProcessInTempOrAppData":    30,
+        "IOCMatchMultiplier":         2.0
+    },
+    "ListeningPorts": {
+        "HighPortNonServerProcess": 15,
+        "ListeningOnAllInterfaces": 10
+    },
+    "ScheduledTasks": {
+        "NonMicrosoftAuthor":     10,
+        "UserWritableActionPath": 25,
+        "LOLBinInArgs":           35
+    },
+    "Services": {
+        "UserWritablePath": 30,
+        "Unsigned":         20,
+        "SuspiciousName":   15
+    },
+    "Autoruns": {
+        "UserWritablePath": 25,
+        "LOLBinInCommand":  35
+    },
+    "DnsCache": {
+        "RawIPEntry":        10,
+        "IOCMatchMultiplier": 2.0
+    },
+    "HostsFile": {
+        "AnyNonDefaultEntry": 40
+    },
+    "LocalAccounts": {
+        "RecentlyCreated":     30,
+        "RecentPasswordSet":   20,
+        "NewAdminGroupMember": 45
+    },
+    "Thresholds": {
+        "High":   50,
+        "Medium": 25
+    }
+}
