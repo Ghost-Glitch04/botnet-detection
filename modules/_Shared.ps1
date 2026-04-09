@@ -38,7 +38,7 @@
 
 #Requires -Version 5.1
 
-# NOTE: No `param` block and no `Set-StrictMode` at file scope — this
+# NOTE: No `param` block and no `Set-StrictMode` at file scope -- this
 # file is dot-sourced into a parent scope (Deploy.ps1 or a standalone
 # pwsh session), and strict-mode settings should be chosen by the
 # caller, not imposed by the library.
@@ -104,9 +104,9 @@ function Write-Log {
 #region  HELPER: Get-Secret
 # Purpose : Retrieve a secret from the process environment with
 #           masked logging. Safe to call even if the secret is
-#           unset — returns $null rather than throwing.
-# Inputs  : -Name (string, mandatory) — env var name
-#           -Required (switch) — if set, throw when missing
+#           unset -- returns $null rather than throwing.
+# Inputs  : -Name (string, mandatory) -- env var name
+#           -Required (switch) -- if set, throw when missing
 # Outputs : The secret value (string) or $null
 # Depends : Write-Log
 #endregion ==================================================
@@ -172,7 +172,7 @@ function Test-IsPrivateIP {
         if ($ip.IsIPv6SiteLocal) { return $true }
         if ([System.Net.IPAddress]::IsLoopback($ip)) { return $true }
         $firstByte = $ip.GetAddressBytes()[0]
-        # fc00::/7 — unique local addresses
+        # fc00::/7 -- unique local addresses
         if (($firstByte -band 0xFE) -eq 0xFC) { return $true }
         return $false
     }
@@ -198,10 +198,10 @@ function Test-IsPrivateIP {
 # Purpose : Return a normalized object describing a process by PID:
 #           name, path, command line, parent PID, user, signer.
 #           Access-denied on any sub-lookup degrades to null fields
-#           rather than throwing — triage must survive sandboxed
+#           rather than throwing -- triage must survive sandboxed
 #           remote shells.
 # Inputs  : -ProcessId (int, mandatory)
-# Outputs : [pscustomobject] — may have null fields on partial failure
+# Outputs : [pscustomobject] -- may have null fields on partial failure
 # Depends : Write-Log (used only for DEBUG on sub-failures)
 #endregion ==================================================
 function Get-ProcessDetails {
@@ -231,7 +231,7 @@ function Get-ProcessDetails {
             $result.CommandLine = $cim.CommandLine
             $result.ParentPid   = $cim.ParentProcessId
 
-            # Owner lookup can fail with access denied — degrade quietly.
+            # Owner lookup can fail with access denied -- degrade quietly.
             try {
                 $owner = Invoke-CimMethod -InputObject $cim -MethodName GetOwner -ErrorAction Stop
                 if ($owner -and $owner.ReturnValue -eq 0) {
@@ -243,7 +243,7 @@ function Get-ProcessDetails {
                 }
             }
 
-            # Signer lookup (best-effort) — only if path is present and readable.
+            # Signer lookup (best-effort) -- only if path is present and readable.
             if ($result.Path -and (Test-Path $result.Path -ErrorAction SilentlyContinue)) {
                 try {
                     $sig = Get-AuthenticodeSignature -FilePath $result.Path -ErrorAction Stop
@@ -272,9 +272,9 @@ function Get-ProcessDetails {
 # Purpose : Load a JSON config file with a hashtable fallback.
 #           If the file is missing or unparseable, returns the
 #           supplied fallback. Emits a warning on fallback.
-# Inputs  : -Path (string, mandatory) — path to JSON file
-#           -Fallback (hashtable) — returned when file unusable
-#           -Label (string) — friendly name for log messages
+# Inputs  : -Path (string, mandatory) -- path to JSON file
+#           -Fallback (hashtable) -- returned when file unusable
+#           -Label (string) -- friendly name for log messages
 # Outputs : [pscustomobject] or [hashtable]
 # Depends : Write-Log
 #endregion ==================================================
@@ -347,7 +347,7 @@ function Invoke-WithRetry {
 #region  HELPER: Import-DotEnv
 # Purpose : Parse a .env file into process environment variables.
 #           Supports KEY=value, KEY="quoted value", KEY='single',
-#           skips comments (#) and blank lines. Missing file →
+#           skips comments (#) and blank lines. Missing file ->
 #           WARN + return (not FATAL) so standalone-paste path
 #           still works.
 # Inputs  : -Path (string, mandatory)
@@ -363,7 +363,7 @@ function Import-DotEnv {
     )
 
     if (-not (Test-Path $Path)) {
-        Write-Log -Level WARN -Message "CONFIG_MISSING: .env file not found at '$Path' — no secrets loaded"
+        Write-Log -Level WARN -Message "CONFIG_MISSING: .env file not found at '$Path' -- no secrets loaded"
         return 0
     }
 
@@ -394,7 +394,7 @@ function Import-DotEnv {
         }
 
         if ([string]::IsNullOrWhiteSpace($val)) {
-            Write-Log -Level DEBUG -Message "DOTENV_EMPTY: $key — skipped"
+            Write-Log -Level DEBUG -Message "DOTENV_EMPTY: $key -- skipped"
             continue
         }
 
@@ -411,10 +411,10 @@ function Import-DotEnv {
 #region  HELPER: Import-LocalConfig
 # Purpose : Merge an example JSON config with an optional local
 #           override file. Local values always win. Missing local
-#           file is not an error — the example is returned as-is.
+#           file is not an error -- the example is returned as-is.
 # Inputs  : -ExamplePath (string, mandatory)
 #           -LocalPath (string, mandatory)
-# Outputs : [pscustomobject] — merged config
+# Outputs : [pscustomobject] -- merged config
 # Depends : Write-Log
 #endregion ==================================================
 function Import-LocalConfig {
@@ -432,7 +432,7 @@ function Import-LocalConfig {
     $example = Get-Content -Path $ExamplePath -Raw | ConvertFrom-Json -ErrorAction Stop
 
     if (-not (Test-Path $LocalPath)) {
-        Write-Log -Level DEBUG -Message "CONFIG_LOCAL_ABSENT: '$LocalPath' — using example values only"
+        Write-Log -Level DEBUG -Message "CONFIG_LOCAL_ABSENT: '$LocalPath' -- using example values only"
         return $example
     }
 
@@ -453,7 +453,7 @@ function Import-LocalConfig {
         }
     }
 
-    Write-Log -Level INFO -Message "CONFIG_MERGED: example='$ExamplePath' ← local='$LocalPath'"
+    Write-Log -Level INFO -Message "CONFIG_MERGED: example='$ExamplePath' <- local='$LocalPath'"
     return $example
 }
 
@@ -465,7 +465,7 @@ function Import-LocalConfig {
 #           log line emission. Canonical pattern list per
 #           github-security-standards_V4.
 # Inputs  : -Parameters (hashtable, mandatory)
-# Outputs : [string] — "Key1='value1' | Key2='***' | ..."
+# Outputs : [string] -- "Key1='value1' | Key2='***' | ..."
 # Depends : None
 #endregion ==================================================
 function Get-MaskedParams {
@@ -535,7 +535,7 @@ function Invoke-PhaseStart {
 #           caller's $StopAfterPhase param matches. A gate stop
 #           is a clean success, not a failure.
 # Inputs  : -PhaseName (string, mandatory)
-#           -Summary (string, optional) — freeform detail
+#           -Summary (string, optional) -- freeform detail
 # Outputs : Logs PHASE_END; may exit 0 if gate triggered
 # Depends : $StopAfterPhase (caller's param scope)
 #           $script:PhaseTimer, $script:ScriptTimer, Write-Log
@@ -618,7 +618,7 @@ function Verify-JsonOutput {
 
 # ============================================================
 # ============================================================
-#                    PHASE 2 — STUB HELPERS
+#                    PHASE 2 -- STUB HELPERS
 # ============================================================
 # The following helpers are placeholders so that modules which
 # reference them dot-source cleanly in Phase 1. Each emits a
@@ -626,7 +626,7 @@ function Verify-JsonOutput {
 # will replace them with real implementations lifted from the
 # upstream network-dfir library.
 #
-# Any Phase 1 code path that calls one of these is a bug —
+# Any Phase 1 code path that calls one of these is a bug --
 # Phase 1 is strictly offline-capable with no enrichment.
 # ============================================================
 

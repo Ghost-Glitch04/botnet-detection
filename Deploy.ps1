@@ -7,9 +7,9 @@
     toolkit when invoked via `git clone` deployment. It is responsible
     for the entire bootstrap sequence:
 
-        Init → Logging → EnvSnapshot → ImportDotEnv → ImportLocalConfig
-            → MaskedParams → OutputDir → DotSourceModules → LoadConfig
-            → Announce
+        Init -> Logging -> EnvSnapshot -> ImportDotEnv -> ImportLocalConfig
+            -> MaskedParams -> OutputDir -> DotSourceModules -> LoadConfig
+            -> Announce
 
     After Deploy.ps1 completes, the operator's session has:
         - $script:LogFile pointing at the deploy log
@@ -26,7 +26,7 @@
     without _Shared.ps1 ever loading.
 
     Deploy.ps1 is therefore optimized for the cloned-repo path. It
-    does NOT try to be standalone — it assumes the repo layout exists.
+    does NOT try to be standalone -- it assumes the repo layout exists.
 
 .PARAMETER OutputDir
     Where logs and artifacts go. Defaults to "$PSScriptRoot\output".
@@ -46,10 +46,10 @@
 
 .NOTES
     Exit codes:
-        0  — full success
-        10 — config file missing (non-fatal; Deploy continues with warnings)
-        20 — module dot-source failure (a critical helper file failed to load)
-        99 — unhandled error
+        0  -- full success
+        10 -- config file missing (non-fatal; Deploy continues with warnings)
+        20 -- module dot-source failure (a critical helper file failed to load)
+        99 -- unhandled error
 #>
 
 [CmdletBinding()]
@@ -112,7 +112,7 @@ try {
 #region  U-Logging
 # Purpose : Initialize $script:LogFile and emit SCRIPT_START.
 #           Cannot use Write-Log yet because _Shared.ps1 is not
-#           dot-sourced — define an INLINE bootstrap logger that
+#           dot-sourced -- define an INLINE bootstrap logger that
 #           is replaced by the authoritative one after dot-source.
 # ============================================================
 $ts = Get-Date -Format 'yyyyMMdd-HHmmss'
@@ -123,7 +123,7 @@ if (-not $DryRun) {
     try { New-Item -ItemType File -Path $script:LogFile -Force -ErrorAction Stop | Out-Null } catch { }
 }
 
-# Inline bootstrap Write-Log — used until _Shared.ps1 dot-sources its
+# Inline bootstrap Write-Log -- used until _Shared.ps1 dot-sources its
 # authoritative version (which has the same signature). After dot-source
 # Write-Log gets redefined and this version is replaced.
 function Write-Log {
@@ -177,7 +177,7 @@ function Invoke-DeployUnit {
         $script:DeployStatus[$UnitName] = 'FAILED'
         $script:DeployErrors += [pscustomobject]@{ Unit = $UnitName; Error = $_.Exception.Message }
         if ($Critical) {
-            Write-Log -Level ERROR -Message "CRITICAL_UNIT_FAILED: $UnitName — aborting Deploy.ps1"
+            Write-Log -Level ERROR -Message "CRITICAL_UNIT_FAILED: $UnitName -- aborting Deploy.ps1"
             exit 20
         }
     }
@@ -207,10 +207,10 @@ Invoke-DeployUnit -UnitName 'U-EnvSnapshot' -Body {
 #           are available for the units below. Then dot-source the
 #           Invoke-* modules.
 #
-# Critical: yes — without _Shared.ps1 the rest of the bootstrap
+# Critical: yes -- without _Shared.ps1 the rest of the bootstrap
 #           units have no way to do their job.
 #
-# IMPORTANT — this unit is NOT wrapped in Invoke-DeployUnit. The
+# IMPORTANT -- this unit is NOT wrapped in Invoke-DeployUnit. The
 # wrapper invokes its body via `& $Body`, which creates a child
 # scope. Functions defined inside a child scope die when that scope
 # pops, so dot-sourcing _Shared.ps1 from within the wrapper would
@@ -231,7 +231,7 @@ try {
 } catch {
     $sw.Stop()
     Write-Log -Level ERROR -Message "UNIT_FAILED: U-DotSourceModules | $($_.Exception.Message)"
-    Write-Log -Level ERROR -Message "CRITICAL_UNIT_FAILED: U-DotSourceModules — aborting Deploy.ps1"
+    Write-Log -Level ERROR -Message "CRITICAL_UNIT_FAILED: U-DotSourceModules -- aborting Deploy.ps1"
     $script:DeployStatus['U-DotSourceModules'] = 'FAILED'
     exit 20
 }
@@ -257,7 +257,7 @@ if ($moduleFiles.Count -eq 0) {
 }
 $sw.Stop()
 if ($dotSourceFailed) {
-    Write-Log -Level WARN -Message "UNIT_END: U-DotSourceModules | Duration: $($sw.Elapsed.TotalSeconds)s | partial — see DOTSOURCE_FAILED entries"
+    Write-Log -Level WARN -Message "UNIT_END: U-DotSourceModules | Duration: $($sw.Elapsed.TotalSeconds)s | partial -- see DOTSOURCE_FAILED entries"
     $script:DeployStatus['U-DotSourceModules'] = 'PARTIAL'
 } else {
     Write-Log -Level INFO -Message "UNIT_END: U-DotSourceModules | Duration: $($sw.Elapsed.TotalSeconds)s"
@@ -292,7 +292,7 @@ $script:ToolkitFunctionNames = @($script:ToolkitFunctionNames | Select-Object -U
 Invoke-DeployUnit -UnitName 'U-ImportDotEnv' -Body {
     $envPath = Join-Path $script:DeployRoot '.env'
     if (-not (Test-Path $envPath)) {
-        Write-Log -Level WARN -Message "CONFIG_MISSING: .env file not found at '$envPath' (non-fatal — Phase 1 has no API dependencies)"
+        Write-Log -Level WARN -Message "CONFIG_MISSING: .env file not found at '$envPath' (non-fatal -- Phase 1 has no API dependencies)"
         return
     }
     $count = Import-DotEnv -Path $envPath
@@ -336,7 +336,7 @@ Invoke-DeployUnit -UnitName 'U-MaskedParams' -Body {
 #region  U-LoadConfig
 # Purpose : Populate $script:Exclusions and $script:TriageWeights
 #           from config/exclusions.json and config/triage-weights.json.
-#           Hardcoded fallbacks when files absent — Resolve-Config
+#           Hardcoded fallbacks when files absent -- Resolve-Config
 #           handles the file-vs-fallback decision and logs the result.
 # ============================================================
 Invoke-DeployUnit -UnitName 'U-LoadConfig' -Body {
@@ -379,7 +379,7 @@ Invoke-DeployUnit -UnitName 'U-LoadConfig' -Body {
 Invoke-DeployUnit -UnitName 'U-Announce' -Body {
     # Filter to functions whose names came from our modules/Invoke-*.ps1
     # files (captured into $script:ToolkitFunctionNames during U-DotSourceModules).
-    # Cross-check that each is actually defined in the current session — a
+    # Cross-check that each is actually defined in the current session -- a
     # name in the AST list that isn't in scope means the file failed to
     # dot-source even though parsing succeeded.
     $available = @()
@@ -391,7 +391,7 @@ Invoke-DeployUnit -UnitName 'U-Announce' -Body {
     if ($available.Count -gt 0) {
         Write-Log -Level INFO -Message "AVAILABLE_COMMANDS: $($available -join ', ')"
     } else {
-        Write-Log -Level WARN -Message "AVAILABLE_COMMANDS: none — no toolkit Invoke-* commands found in scope"
+        Write-Log -Level WARN -Message "AVAILABLE_COMMANDS: none -- no toolkit Invoke-* commands found in scope"
     }
 }
 #endregion U-Announce

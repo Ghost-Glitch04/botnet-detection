@@ -106,7 +106,15 @@ note it in the current phase file.
 | lessons-learned,planning | AI-file rule counts that aggregate cross-references can overcount — graduation passes should recount with deduplication | phase10_lessons_finalize.md#2pitfall | pitfall |
 | lessons-learned,docs | AI subject files use terse When/Rule template (not narrative) + `*Source:*` line as bridge — narrative lives in phase files, AI files are pure rules | phase10_lessons_finalize.md#1design | design |
 | lessons-learned,scoping | Concern maps live inline in `_overview.md` (not separate files) until ~5 entries each — keeps single entry point flat | phase10_lessons_finalize.md#2design | design |
-| lessons-learned,coupling,planning | Foundation graduation is a phase-boundary activity, not a phase-finalization activity — defer until next phase transition | phase10_lessons_finalize.md#3design | design |
+| lessons-learned,coupling,planning | Foundation graduation is a phase-boundary activity, not a phase-finalization activity -- defer until next phase transition | phase10_lessons_finalize.md#3design | design |
+| powershell,encoding,debugging | PS 5.1 reads .ps1 files as Windows-1252 unless BOM present -- UTF-8 em-dashes/arrows in comments break parser with cascading "Expressions are only allowed as the first element of a pipeline" | phase11_ps51_encoding_fix.md#1 | went-well |
+| powershell,encoding,debugging | Mojibake signatures (`â€"`, `â€™`, `â€œ`, `Â`) in PS 5.1 error output instantly name an encoding bug -- scan the error text for these before chasing the cited line number | phase11_ps51_encoding_fix.md#1 | went-well |
+| powershell,encoding,verification | Before bulk-fixing encoding bugs, enumerate codepoints + counts -- bounded substitution map is auditable and reversible; greedy strip-and-replace destroys information | phase11_ps51_encoding_fix.md#2 | went-well |
+| powershell,encoding,verification | Encoding fix scope = every text file the operator might READ, not just files the parser chokes on -- mojibake in a security tool erodes trust as fast as a real bug | phase11_ps51_encoding_fix.md#3 | went-well |
+| testing,powershell,verification | No verification tier covering "PS 5.1 reads file" = the bug class ships -- multi-tier rule (phase08#1) re-applies as predictive warning | phase11_ps51_encoding_fix.md#1pitfall | pitfall |
+| powershell,verification,defensive | Round-trip equality checks compare original-after-substitution against bytes-decoded-back -- `Contains('?')` false-positives on legitimate `?` chars in source | phase11_ps51_encoding_fix.md#3pitfall | pitfall |
+| powershell,encoding,deployment | Prefer ASCII replacement over UTF-8 BOM for shipping .ps1 -- standalone-paste path can't survive BOM bytes; ASCII has zero failure modes across editors/tools/shells | phase11_ps51_encoding_fix.md#1design | design |
+| testing,git,privacy | One-shot diagnostic scripts live in gitignored `output/` -- generalizes phase08#2design (test fixtures) to one-shot tooling | phase11_ps51_encoding_fix.md#2design | design |
 
 ## Foundation
 

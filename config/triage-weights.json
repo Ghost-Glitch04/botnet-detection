@@ -1,5 +1,5 @@
 {
-    "Description": "Risk scoring weights for Invoke-BotnetTriage (Phase 1 — wide-shallow triage module). Tune per engagement. Thresholds map numeric scores to High/Medium/Low verdicts.",
+    "Description": "Risk scoring weights for Invoke-BotnetTriage (Phase 1 -- wide-shallow triage module). Tune per engagement. Thresholds map numeric scores to High/Medium/Low verdicts.",
     "Connections": {
         "PrivateToPublicNonBrowser": 25,
         "ProcessInTempOrAppData":    30,

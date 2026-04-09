@@ -1,11 +1,11 @@
 # ================================================================
-# IOC Template — Network Forensics Toolkit
+# IOC Template -- Network Forensics Toolkit
 # ================================================================
 #
 # This file is a blank template. Copy it to a new file for your
 # engagement (e.g. iocs/acme_2026-04.txt) and populate with
 # indicators. Engagement-specific IOC files are gitignored by
-# default — only this template ships in the repo.
+# default -- only this template ships in the repo.
 #
 # ----------------------------------------------------------------
 # FORMAT
@@ -15,7 +15,7 @@
 # - Lines beginning with "#" are comments (ignored by loader).
 # - Leading/trailing whitespace is stripped.
 # - Indicators are matched case-insensitively.
-# - No inline comments — "1.2.3.4  # bad guy" will NOT strip the
+# - No inline comments -- "1.2.3.4  # bad guy" will NOT strip the
 #   comment; put the comment on its own line above the indicator.
 #
 # ----------------------------------------------------------------
@@ -35,13 +35,13 @@
 # ----------------------------------------------------------------
 # WHERE THESE ARE CROSS-REFERENCED BY Invoke-BotnetTriage
 # ----------------------------------------------------------------
-#   IPs / CIDRs   → TCP connection remote addresses, DNS cache resolved IPs
-#   Domains       → DNS cache entries, hosts file entries
-#   URLs          → scheduled task / service command lines
-#   Hashes        → (Phase 2 — not used by Invoke-BotnetTriage)
+#   IPs / CIDRs   -> TCP connection remote addresses, DNS cache resolved IPs
+#   Domains       -> DNS cache entries, hosts file entries
+#   URLs          -> scheduled task / service command lines
+#   Hashes        -> (Phase 2 -- not used by Invoke-BotnetTriage)
 #
 # An IOC match acts as a score multiplier on findings, not as a
-# standalone finding — the triage module flags suspicious state
+# standalone finding -- the triage module flags suspicious state
 # regardless of IOCs, and matching IOCs amplify the score.
 #
 # ----------------------------------------------------------------

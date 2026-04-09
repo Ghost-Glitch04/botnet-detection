@@ -11,7 +11,7 @@
 
     Offline-capable by design: no API keys, no threat-intel lookups, no
     outbound network calls. The module exists to answer "is this host
-    worth investigating at all, and if so where should I look?" — NOT
+    worth investigating at all, and if so where should I look?" -- NOT
     "is this host beaconing right now, and to where?" The deep question
     is answered by Phase 2's Invoke-C2BeaconHunt.
 
@@ -72,9 +72,9 @@
       0  = Success (or clean phase-gate exit)
       10 = Input / config error (unreadable IOC file, output dir denied)
       11 = Malformed input (JSON weights/exclusions parse failure after
-                           fallback rejection — currently unreachable
+                           fallback rejection -- currently unreachable
                            because Resolve-Config always falls back)
-      20 = Processing error (not used — units fault-tolerate individually)
+      20 = Processing error (not used -- units fault-tolerate individually)
       40 = Output verification failed (JSON missing, empty, malformed)
       99 = Unhandled exception in the function body
 #>
@@ -298,7 +298,7 @@ function Invoke-BotnetTriage {
 
     # ==========================================================
     # PRE-FLIGHT BOOTSTRAP
-    # (happens before Phase A — needed so Write-Log file target
+    # (happens before Phase A -- needed so Write-Log file target
     # and output dir exist before any unit runs)
     # ==========================================================
 
@@ -338,8 +338,8 @@ function Invoke-BotnetTriage {
     Write-Log -Level INFO -Message "SCRIPT_START: Invoke-BotnetTriage | Host: $hostName | User: $env:USERNAME"
     Write-Log -Level INFO -Message "ENV_SNAPSHOT: PSVersion=$($PSVersionTable.PSVersion) | OS=$([System.Environment]::OSVersion.VersionString) | OutputDir='$OutputDir'"
     Write-Log -Level INFO -Message "PARAMS: OutputDir='$OutputDir' | IOCFile='$IOCFile' | ExclusionsFile='$ExclusionsFile' | WeightsFile='$WeightsFile' | DaysBackForAccounts=$DaysBackForAccounts | StopAfterPhase=$StopAfterPhase | DryRun=$DryRun | DebugMode=$DebugMode"
-    if ($DryRun)    { Write-Log -Level WARN -Message "DRY-RUN MODE ACTIVE — no files will be written" }
-    if ($DebugMode) { Write-Log -Level INFO -Message "DEBUG MODE ACTIVE — DEBUG entries promoted to console" }
+    if ($DryRun)    { Write-Log -Level WARN -Message "DRY-RUN MODE ACTIVE -- no files will be written" }
+    if ($DebugMode) { Write-Log -Level INFO -Message "DEBUG MODE ACTIVE -- DEBUG entries promoted to console" }
 
     # Function-local state containers
     $triageData = @{
@@ -356,7 +356,7 @@ function Invoke-BotnetTriage {
     $configSource = 'file'  # flipped to 'inline-fallback' if Resolve-Config falls through
 
     # Inline unit lifecycle helper: wraps a unit body with start/end/failed
-    # logging, updates $errors on failure, and NEVER rethrows — per
+    # logging, updates $errors on failure, and NEVER rethrows -- per
     # PHASE1_PLAN: one unit failing does not abort the whole triage.
     function Invoke-TriageUnit {
         param(
@@ -386,7 +386,7 @@ function Invoke-BotnetTriage {
 
 
     # ==========================================================
-    # PHASE A — PREFLIGHT
+    # PHASE A -- PREFLIGHT
     # ==========================================================
 
     Invoke-PhaseStart -PhaseName 'Preflight'
@@ -398,7 +398,7 @@ function Invoke-BotnetTriage {
             throw "IOCFile '$IOCFile' does not exist"
         }
 
-        # Elevation check — warn only, don't fail
+        # Elevation check -- warn only, don't fail
         $wid = [System.Security.Principal.WindowsIdentity]::GetCurrent()
         $wp  = [System.Security.Principal.WindowsPrincipal]::new($wid)
         $isAdmin = $wp.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -444,7 +444,7 @@ function Invoke-BotnetTriage {
         $script:Exclusions    = Resolve-Config -Path $ExclusionsFile -Fallback $exclFallback -Label 'exclusions.json'
         $script:TriageWeights = Resolve-Config -Path $WeightsFile    -Fallback $weightsFallback -Label 'triage-weights.json'
 
-        # Detect fallback usage — if the returned object is a hashtable
+        # Detect fallback usage -- if the returned object is a hashtable
         # (our $exclFallback) rather than a PSCustomObject (ConvertFrom-Json
         # output), Resolve-Config fell through.
         if ($script:Exclusions -is [hashtable] -or $script:TriageWeights -is [hashtable]) {
@@ -459,11 +459,11 @@ function Invoke-BotnetTriage {
     $script:IOCSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     Invoke-TriageUnit -UnitName 'U-LoadIOCs' -Body {
         if (-not $IOCFile) {
-            Write-Log -Level INFO -Message "IOC_FILE_ABSENT: no -IOCFile specified — skipping IOC correlation"
+            Write-Log -Level INFO -Message "IOC_FILE_ABSENT: no -IOCFile specified -- skipping IOC correlation"
             return
         }
         if (-not (Test-Path $IOCFile)) {
-            Write-Log -Level WARN -Message "IOC_FILE_MISSING: '$IOCFile' — continuing without IOCs"
+            Write-Log -Level WARN -Message "IOC_FILE_MISSING: '$IOCFile' -- continuing without IOCs"
             return
         }
         $lines = Get-Content -Path $IOCFile -ErrorAction Stop
@@ -482,7 +482,7 @@ function Invoke-BotnetTriage {
 
 
     # ==========================================================
-    # PHASE B — COLLECTION
+    # PHASE B -- COLLECTION
     # ==========================================================
 
     Invoke-PhaseStart -PhaseName 'Collection'
@@ -507,7 +507,7 @@ function Invoke-BotnetTriage {
         }
         Write-Log -Level DEBUG -Message "PROC_INDEX_BUILT: $($procIndex.Count) processes cached"
     } catch {
-        Write-Log -Level WARN -Message "PROC_INDEX_FAILED: $($_.Exception.Message) — units will fall back to slower per-row lookup"
+        Write-Log -Level WARN -Message "PROC_INDEX_FAILED: $($_.Exception.Message) -- units will fall back to slower per-row lookup"
     }
 
     # ---- U-ConnectionsSnapshot ----
@@ -601,7 +601,7 @@ function Invoke-BotnetTriage {
             }
             # Scheduled task actions are polymorphic CIM instances:
             # MSFT_TaskExecAction has Execute/Arguments, but
-            # MSFT_TaskComHandlerAction (and others) do NOT — under
+            # MSFT_TaskComHandlerAction (and others) do NOT -- under
             # Set-StrictMode -Version Latest, accessing $a.Execute on a
             # COM-handler action throws. Probe via PSObject.Properties.
             $actionStrings = @()
@@ -653,7 +653,7 @@ function Invoke-BotnetTriage {
                 $flags += 'UserWritablePath'
             }
             # Authenticode check: ONLY flag truly unsigned. The
-            # "untrusted signer" check is intentionally dropped — it
+            # "untrusted signer" check is intentionally dropped -- it
             # produces a flood of false positives against any legitimate
             # third-party signed software (anti-virus other than the one
             # in our exclusion list, browsers, productivity apps, etc).
@@ -670,7 +670,7 @@ function Invoke-BotnetTriage {
             }
             # Service-name heuristic intentionally omitted in Phase 1.
             # The original `^[a-z]{8,}$` matched `wuauserv`,
-            # `lanmanworkstation`, etc — almost every legit Windows
+            # `lanmanworkstation`, etc -- almost every legit Windows
             # service. A real entropy/randomness check belongs in
             # Phase 2 alongside the IOC correlator.
             $iocHit = $false
@@ -826,7 +826,7 @@ function Invoke-BotnetTriage {
             if ($u.PasswordLastSet -and $u.PasswordLastSet -gt $cutoff) {
                 $flags += 'RecentPasswordSet'
             }
-            # Heuristic "recently created": if SID was issued recently — not directly available.
+            # Heuristic "recently created": if SID was issued recently -- not directly available.
             # Fall back to PasswordLastSet as a proxy for user activity.
             if ($flags.Count -gt 0) {
                 $results += [pscustomobject]@{
@@ -845,7 +845,7 @@ function Invoke-BotnetTriage {
         try {
             $admins = Get-LocalGroupMember -Group 'Administrators' -ErrorAction Stop
             foreach ($m in $admins) {
-                # Match against the name-only portion (MACHINE\User → User)
+                # Match against the name-only portion (MACHINE\User -> User)
                 $nameOnly = ($m.Name -split '\\')[-1]
                 $existing = $results | Where-Object { $_.Name -eq $nameOnly }
                 if ($existing) {
@@ -853,7 +853,7 @@ function Invoke-BotnetTriage {
                 } else {
                     # Only flag if this account is also flagged as recently changed;
                     # otherwise an admin is just a normal admin.
-                    # Actually the plan says "new Administrators group member" — we
+                    # Actually the plan says "new Administrators group member" -- we
                     # flag all admins for visibility and let the scorer decide.
                     $results += [pscustomobject]@{
                         Name            = $nameOnly
@@ -878,7 +878,7 @@ function Invoke-BotnetTriage {
 
 
     # ==========================================================
-    # PHASE C — PROCESSING
+    # PHASE C -- PROCESSING
     # ==========================================================
 
     Invoke-PhaseStart -PhaseName 'Processing'
@@ -1079,7 +1079,7 @@ function Invoke-BotnetTriage {
 
 
     # ==========================================================
-    # PHASE D — OUTPUT
+    # PHASE D -- OUTPUT
     # ==========================================================
 
     Invoke-PhaseStart -PhaseName 'Output'
@@ -1168,7 +1168,7 @@ function Invoke-BotnetTriage {
                 }
                 $flagStr = ($f.Flags -join ',')
                 $iocTag  = if ($f.IOCMatch) { ' [IOC]' } else { '' }
-                Write-Host ("  {0}. [{1,-6}] score={2,-6} {3} — {4}{5}" -f $i, $f.Risk, $f.Score, $f.Category, $flagStr, $iocTag) -ForegroundColor $riskColor
+                Write-Host ("  {0}. [{1,-6}] score={2,-6} {3} -- {4}{5}" -f $i, $f.Risk, $f.Score, $f.Category, $flagStr, $iocTag) -ForegroundColor $riskColor
                 $i++
             }
         }
