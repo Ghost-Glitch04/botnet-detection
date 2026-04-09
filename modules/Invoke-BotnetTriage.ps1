@@ -398,10 +398,13 @@ function Invoke-BotnetTriage {
             throw "IOCFile '$IOCFile' does not exist"
         }
 
-        # Elevation check -- warn only, don't fail
+        # Elevation check -- warn only, don't fail. Lift to script scope so
+        # U-WriteSummary can render a prominent banner and the JSON meta block
+        # can record the elevation state for downstream tooling.
         $wid = [System.Security.Principal.WindowsIdentity]::GetCurrent()
         $wp  = [System.Security.Principal.WindowsPrincipal]::new($wid)
         $isAdmin = $wp.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
+        $script:Elevated = [bool]$isAdmin
         if (-not $isAdmin) {
             Write-Log -Level WARN -Message "NOT_ELEVATED: running as non-admin | Some data sources (CIM, accounts) may return partial results"
         } else {
@@ -430,7 +433,7 @@ function Invoke-BotnetTriage {
             TrustedSigners = @('Microsoft Corporation','Microsoft Windows')
         }
         $weightsFallback = @{
-            Connections    = @{ PrivateToPublicNonBrowser = 25; ProcessInTempOrAppData = 30; NonStandardPort = 20; SuspiciousParentProcess = 50; PathOutsideSystem32 = 40; IOCMatchMultiplier = 2.0 }
+            Connections    = @{ PrivateToPublicNonBrowser = 25; ProcessInTempOrAppData = 30; NonStandardPort = 20; SuspiciousParentProcess = 50; PathOutsideSystem32 = 40; EnrichmentIncomplete = 0; IOCMatchMultiplier = 2.0 }
             ListeningPorts = @{ HighPortAllInterfaces = 15; ListeningOnAllInterfaces = 10 }
             ScheduledTasks = @{ NonMicrosoftAuthor = 10; UserWritableActionPath = 25; LOLBinInArgs = 35 }
             Services       = @{ UserWritablePath = 30; Unsigned = 20; SuspiciousName = 15 }
@@ -543,6 +546,20 @@ function Invoke-BotnetTriage {
         # A public connection to a port NOT in this list is additional signal.
         $commonPorts = @(80, 443, 8080, 8443, 53, 123, 25, 587, 465, 993, 995, 22, 3389, 5985, 5986, 21, 110, 143)
 
+        # Per-run signer cache: path -> bool (signed by a trusted publisher).
+        # Many legitimate apps install under %LOCALAPPDATA% by design (OneDrive,
+        # Teams, VS Code, GitHub Desktop, Discord, Slack, Zoom). The path-based
+        # ProcessInTempOrAppData detector must consult the TrustedSigners
+        # allowlist before firing, or it produces a false High on every clean
+        # Windows host that runs OneDrive. Authenticode lookups are ~50-200ms
+        # so cache by path -- multiple connections from the same process must
+        # not re-sign the binary.
+        $signerCache = @{}
+        $trustedSigners = @()
+        if ($script:Exclusions -and $script:Exclusions.TrustedSigners) {
+            $trustedSigners = @($script:Exclusions.TrustedSigners)
+        }
+
         $conns = Get-NetTCPConnection -State Established -ErrorAction Stop
         $results = @()
         foreach ($c in $conns) {
@@ -561,9 +578,31 @@ function Invoke-BotnetTriage {
                 }
             }
 
-            # ---- ProcessInTempOrAppData ----
+            # ---- ProcessInTempOrAppData (signer-aware) ----
+            # The path is suspicious only when the binary is NOT signed by a
+            # trusted publisher. Microsoft OneDrive, Teams, VS Code, GitHub
+            # Desktop, Discord, Slack, Zoom etc. all install under %LOCALAPPDATA%
+            # legitimately and would otherwise produce a false High on every
+            # clean Windows host. (Bug found: phase 1.2.1 hotfix 2026-04-09)
             if ($pd.Path -and (Test-IsUserWritablePath $pd.Path)) {
-                $flags += 'ProcessInTempOrAppData'
+                $isTrustedSigner = $false
+                if ($signerCache.ContainsKey($pd.Path)) {
+                    $isTrustedSigner = $signerCache[$pd.Path]
+                } else {
+                    try {
+                        $sig = Get-AuthenticodeSignature -FilePath $pd.Path -ErrorAction Stop
+                        if ($sig.Status -eq 'Valid' -and $sig.SignerCertificate) {
+                            $subject = $sig.SignerCertificate.Subject
+                            foreach ($ts in $trustedSigners) {
+                                if ($subject -like "*$ts*") { $isTrustedSigner = $true; break }
+                            }
+                        }
+                    } catch {}
+                    $signerCache[$pd.Path] = $isTrustedSigner
+                }
+                if (-not $isTrustedSigner) {
+                    $flags += 'ProcessInTempOrAppData'
+                }
             }
 
             # ---- PathOutsideSystem32 ----
@@ -599,6 +638,15 @@ function Invoke-BotnetTriage {
             # applied later by U-CorrelateIOCs.
             $iocHit = ($script:IOCSet.Count -gt 0 -and $c.RemoteAddress -and $script:IOCSet.Contains([string]$c.RemoteAddress))
             if ($flags.Count -gt 0 -or $iocHit) {
+                # ---- EnrichmentIncomplete (diagnostic-only, weight 0) ----
+                # Annotate retained rows where the proc cache could not return
+                # full context (typically because we are non-elevated and the
+                # process is owned by SYSTEM or another user). Tells the
+                # operator their vetting context is missing for this specific
+                # row, complementing the global NOT_ELEVATED banner.
+                if ($pd -and (-not $pd.Path -or -not $pd.CommandLine)) {
+                    $flags += 'EnrichmentIncomplete'
+                }
                 $results += [pscustomobject]@{
                     LocalAddress      = $c.LocalAddress
                     LocalPort         = $c.LocalPort
@@ -1223,6 +1271,7 @@ function Invoke-BotnetTriage {
             hostname         = $hostName
             timestamp        = (Get-Date -Format 'o')
             durationSeconds  = $duration
+            elevated         = [bool]$script:Elevated
             exclusionsLoaded = ($null -ne $script:Exclusions)
             iocsLoaded       = ($script:IOCSet.Count -gt 0)
             configSource     = $script:ConfigSource
@@ -1253,6 +1302,17 @@ function Invoke-BotnetTriage {
         Write-Host ""
         Write-Host "================================================================" -ForegroundColor Cyan
         Write-Host "  BOTNET TRIAGE VERDICT: $hostName" -ForegroundColor Cyan
+        # Non-elevated callout: the warning at U-ParamValidate is a single log
+        # line buried mid-output; an operator skimming the verdict needs a
+        # prominent banner saying the data is partial. Only fires when we
+        # KNOW non-elevated -- $script:Elevated -eq $null means unknown,
+        # which we render as nothing rather than misleading the operator.
+        if ($script:Elevated -eq $false) {
+            Write-Host "  ** NOT ELEVATED -- VISIBILITY LIMITED **" -ForegroundColor Yellow
+            Write-Host "     Connection enumeration may be incomplete." -ForegroundColor Yellow
+            Write-Host "     Process paths/cmdlines may be null for non-owned processes." -ForegroundColor Yellow
+            Write-Host "     Re-run as Administrator for full coverage." -ForegroundColor Yellow
+        }
         Write-Host "================================================================" -ForegroundColor Cyan
         Write-Host ("  HIGH:   {0,3}" -f $v.High)   -ForegroundColor Red
         Write-Host ("  MEDIUM: {0,3}" -f $v.Medium) -ForegroundColor Yellow

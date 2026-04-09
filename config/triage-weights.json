@@ -6,6 +6,7 @@
         "NonStandardPort":           20,
         "SuspiciousParentProcess":   50,
         "PathOutsideSystem32":       40,
+        "EnrichmentIncomplete":       0,
         "IOCMatchMultiplier":         2.0
     },
     "ListeningPorts": {

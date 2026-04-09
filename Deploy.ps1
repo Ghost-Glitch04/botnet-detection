@@ -351,7 +351,7 @@ Invoke-DeployUnit -UnitName 'U-LoadConfig' -Body {
     }
     $weightsFallback = @{
         Description    = 'Inline fallback (Deploy.ps1)'
-        Connections    = @{ PrivateToPublicNonBrowser = 25; ProcessInTempOrAppData = 30; NonStandardPort = 20; SuspiciousParentProcess = 50; PathOutsideSystem32 = 40; IOCMatchMultiplier = 2.0 }
+        Connections    = @{ PrivateToPublicNonBrowser = 25; ProcessInTempOrAppData = 30; NonStandardPort = 20; SuspiciousParentProcess = 50; PathOutsideSystem32 = 40; EnrichmentIncomplete = 0; IOCMatchMultiplier = 2.0 }
         ListeningPorts = @{ HighPortAllInterfaces = 15; ListeningOnAllInterfaces = 10 }
         ScheduledTasks = @{ NonMicrosoftAuthor = 10; UserWritableActionPath = 25; LOLBinInArgs = 35 }
         Services       = @{ UserWritablePath = 30; Unsigned = 20 }
