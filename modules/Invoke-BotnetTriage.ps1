@@ -430,8 +430,8 @@ function Invoke-BotnetTriage {
             TrustedSigners = @('Microsoft Corporation','Microsoft Windows')
         }
         $weightsFallback = @{
-            Connections    = @{ PrivateToPublicNonBrowser = 25; ProcessInTempOrAppData = 30; IOCMatchMultiplier = 2.0 }
-            ListeningPorts = @{ HighPortNonServerProcess = 15; ListeningOnAllInterfaces = 10 }
+            Connections    = @{ PrivateToPublicNonBrowser = 25; ProcessInTempOrAppData = 30; NonStandardPort = 20; SuspiciousParentProcess = 50; PathOutsideSystem32 = 40; IOCMatchMultiplier = 2.0 }
+            ListeningPorts = @{ HighPortAllInterfaces = 15; ListeningOnAllInterfaces = 10 }
             ScheduledTasks = @{ NonMicrosoftAuthor = 10; UserWritableActionPath = 25; LOLBinInArgs = 35 }
             Services       = @{ UserWritablePath = 30; Unsigned = 20; SuspiciousName = 15 }
             Autoruns       = @{ UserWritablePath = 25; LOLBinInCommand = 35 }
@@ -510,9 +510,39 @@ function Invoke-BotnetTriage {
         Write-Log -Level WARN -Message "PROC_INDEX_FAILED: $($_.Exception.Message) -- units will fall back to slower per-row lookup"
     }
 
+    # Build a parent-name index for quick lookup in U-ConnectionsSnapshot.
+    # Maps ProcessId -> parent process Name. Used to detect SuspiciousParentProcess.
+    $parentNameIndex = @{}
+    foreach ($pid_ in $procIndex.Keys) {
+        $ppid = $procIndex[$pid_].ParentPid
+        if ($ppid -and $procIndex.ContainsKey([int]$ppid)) {
+            $parentNameIndex[$pid_] = $procIndex[[int]$ppid].Name
+        }
+    }
+
     # ---- U-ConnectionsSnapshot ----
     Invoke-TriageUnit -UnitName 'U-ConnectionsSnapshot' -Body {
         $browserPattern = '^(chrome|firefox|msedge|iexplore|brave|opera|vivaldi|safari|edge)\.exe$'
+
+        # Processes whose canonical System32 path and expected parent are known.
+        # A connection from one of these with the wrong parent or wrong path is a
+        # strong indicator of process injection / masquerading.
+        $expectedParents = @{
+            'svchost.exe'  = 'services.exe'
+            'lsass.exe'    = 'wininit.exe'
+            'csrss.exe'    = 'smss.exe'
+        }
+        $canonicalPaths = @{
+            'svchost.exe'  = (Join-Path $env:SystemRoot 'System32\svchost.exe')
+            'lsass.exe'    = (Join-Path $env:SystemRoot 'System32\lsass.exe')
+            'csrss.exe'    = (Join-Path $env:SystemRoot 'System32\csrss.exe')
+            'services.exe' = (Join-Path $env:SystemRoot 'System32\services.exe')
+        }
+
+        # Ports that are almost always legitimate on any Windows host.
+        # A public connection to a port NOT in this list is additional signal.
+        $commonPorts = @(80, 443, 8080, 8443, 53, 123, 25, 587, 465, 993, 995, 22, 3389, 5985, 5986, 21, 110, 143)
+
         $conns = Get-NetTCPConnection -State Established -ErrorAction Stop
         $results = @()
         foreach ($c in $conns) {
@@ -520,33 +550,69 @@ function Invoke-BotnetTriage {
             $localIsPrivate  = Test-IsPrivateIP -IPAddress $c.LocalAddress
             $pid_ = [int]$c.OwningProcess
             $pd = if ($procIndex.ContainsKey($pid_)) { $procIndex[$pid_] } else { Get-ProcessDetails -ProcessId $pid_ }
+            $procNameLower = if ($pd.Name) { $pd.Name.ToLowerInvariant() } else { '' }
 
             $flags = @()
+
+            # ---- PrivateToPublicNonBrowser ----
             if (-not $remoteIsPrivate -and $localIsPrivate) {
                 if ($pd.Name -and $pd.Name -notmatch $browserPattern) {
                     $flags += 'PrivateToPublicNonBrowser'
                 }
             }
+
+            # ---- ProcessInTempOrAppData ----
             if ($pd.Path -and (Test-IsUserWritablePath $pd.Path)) {
                 $flags += 'ProcessInTempOrAppData'
             }
+
+            # ---- PathOutsideSystem32 ----
+            # Fires when a process that should only run from System32 is running
+            # from somewhere else (masquerade / side-loading attack).
+            if ($pd.Path -and $canonicalPaths.ContainsKey($procNameLower)) {
+                $canonical = $canonicalPaths[$procNameLower]
+                if ($pd.Path.ToLowerInvariant() -ne $canonical.ToLowerInvariant()) {
+                    $flags += 'PathOutsideSystem32'
+                }
+            }
+
+            # ---- SuspiciousParentProcess ----
+            # Fires when a well-known system process has an unexpected parent --
+            # the primary indicator of process hollowing / injection.
+            $expectedParent = $expectedParents[$procNameLower]
+            if ($expectedParent) {
+                $actualParent = $parentNameIndex[$pid_]
+                if ($actualParent -and $actualParent.ToLowerInvariant() -ne $expectedParent) {
+                    $flags += 'SuspiciousParentProcess'
+                }
+            }
+
+            # ---- NonStandardPort ----
+            # Fires on any public connection to a port outside the common legitimate
+            # set. Adds a second scoring axis independent of process identity.
+            if (-not $remoteIsPrivate -and $c.RemotePort -notin $commonPorts) {
+                $flags += 'NonStandardPort'
+            }
+
             # IOC pre-retain: an IOC match alone is enough to keep this
             # row even if no heuristic flagged it. Score multiplier is
             # applied later by U-CorrelateIOCs.
             $iocHit = ($script:IOCSet.Count -gt 0 -and $c.RemoteAddress -and $script:IOCSet.Contains([string]$c.RemoteAddress))
             if ($flags.Count -gt 0 -or $iocHit) {
                 $results += [pscustomobject]@{
-                    LocalAddress  = $c.LocalAddress
-                    LocalPort     = $c.LocalPort
-                    RemoteAddress = $c.RemoteAddress
-                    RemotePort    = $c.RemotePort
-                    ProcessId     = $c.OwningProcess
-                    ProcessName   = $pd.Name
-                    ProcessPath   = $pd.Path
-                    Flags         = $flags
-                    Score         = 0
-                    IOCMatch      = $false
-                    Risk          = 'Low'
+                    LocalAddress      = $c.LocalAddress
+                    LocalPort         = $c.LocalPort
+                    RemoteAddress     = $c.RemoteAddress
+                    RemotePort        = $c.RemotePort
+                    ProcessId         = $c.OwningProcess
+                    ProcessName       = $pd.Name
+                    ProcessPath       = $pd.Path
+                    CommandLine       = $pd.CommandLine
+                    ParentProcessName = $parentNameIndex[$pid_]
+                    Flags             = $flags
+                    Score             = 0
+                    IOCMatch          = $false
+                    Risk              = 'Low'
                 }
             }
         }
@@ -558,16 +624,24 @@ function Invoke-BotnetTriage {
     Invoke-TriageUnit -UnitName 'U-ListeningPorts' -Body {
         $listens = Get-NetTCPConnection -State Listen -ErrorAction Stop
         $wellKnownServers = @(80, 443, 22, 445, 135, 139, 3389, 5985, 5986, 53, 88)
+        # System processes that are expected to bind listeners.
+        $sysListeners = '^(svchost|lsass|services|system|wininit|spoolsv|csrss|smss|audiodg|WUDFHost)\.exe$'
         $results = @()
         foreach ($l in $listens) {
             $pid_ = [int]$l.OwningProcess
             $pd = if ($procIndex.ContainsKey($pid_)) { $procIndex[$pid_] } else { Get-ProcessDetails -ProcessId $pid_ }
+            $isSys = $pd.Name -and $pd.Name -match $sysListeners
             $flags = @()
-            if ($l.LocalPort -gt 49152 -and $pd.Name -notmatch '^(svchost|lsass|services|system)') {
-                $flags += 'HighPortNonServerProcess'
+            # HighPortAllInterfaces: high ephemeral port (>49152) AND accessible
+            # externally (0.0.0.0 or ::). Purely local high-port listeners are
+            # normal RPC/IPC channels and are NOT flagged.
+            if ($l.LocalPort -gt 49152 -and -not $isSys) {
+                if ($l.LocalAddress -eq '0.0.0.0' -or $l.LocalAddress -eq '::') {
+                    $flags += 'HighPortAllInterfaces'
+                }
             }
             if ($l.LocalAddress -eq '0.0.0.0' -and $l.LocalPort -notin $wellKnownServers) {
-                if ($pd.Name -notmatch '^(svchost|lsass|services|system|wininit|spoolsv)') {
+                if (-not $isSys) {
                     $flags += 'ListeningOnAllInterfaces'
                 }
             }
@@ -885,10 +959,14 @@ function Invoke-BotnetTriage {
 
     # ---- U-ApplyExclusions ----
     Invoke-TriageUnit -UnitName 'U-ApplyExclusions' -Body {
-        $excludedProcs = @()
-        $excludedPorts = @()
-        if ($script:Exclusions.Processes) { $excludedProcs = @($script:Exclusions.Processes) }
-        if ($script:Exclusions.Ports)     { $excludedPorts = @($script:Exclusions.Ports) }
+        $excludedProcs  = @()
+        $excludedPorts  = @()
+        $localOnlyPorts = @()
+        $beaconWL       = @()
+        if ($script:Exclusions.Processes)      { $excludedProcs  = @($script:Exclusions.Processes) }
+        if ($script:Exclusions.Ports)          { $excludedPorts  = @($script:Exclusions.Ports) }
+        if ($script:Exclusions.LocalOnlyPorts) { $localOnlyPorts = @($script:Exclusions.LocalOnlyPorts) }
+        if ($script:Exclusions.BeaconWhitelist){ $beaconWL       = @($script:Exclusions.BeaconWhitelist) }
 
         $beforeConn = $triageData.Connections.Count
         $triageData.Connections = @($triageData.Connections | Where-Object {
@@ -900,10 +978,35 @@ function Invoke-BotnetTriage {
             $keep
         })
 
+        # BeaconWhitelist: operator-confirmed benign process+port tuples.
+        # Ships empty -- populated per-engagement after the operator has
+        # verified a connection is benign (e.g. via packet capture).
+        if ($beaconWL.Count -gt 0) {
+            $beforeBW = $triageData.Connections.Count
+            $triageData.Connections = @($triageData.Connections | Where-Object {
+                $pn = if ($_.ProcessName) { [System.IO.Path]::GetFileNameWithoutExtension($_.ProcessName) } else { '' }
+                $rp = [int]$_.RemotePort
+                $suppress = $false
+                foreach ($bw in $beaconWL) {
+                    $bwProc = [System.IO.Path]::GetFileNameWithoutExtension([string]$bw.Process)
+                    if ($pn -eq $bwProc -and $rp -eq [int]$bw.RemotePort) { $suppress = $true; break }
+                }
+                -not $suppress
+            })
+            Write-Log -Level INFO -Message "BEACON_WHITELIST_APPLIED: connections $beforeBW->$($triageData.Connections.Count)"
+        }
+
         $beforeList = $triageData.ListeningPorts.Count
         $triageData.ListeningPorts = @($triageData.ListeningPorts | Where-Object {
             $keep = $true
             if ($_.LocalPort -in $excludedPorts) { $keep = $false }
+            # LocalOnlyPorts: ports expected only on loopback (RPC, SMB helper ports, etc.)
+            # Suppress them when the listener is actually loopback-only.
+            if ($keep -and $localOnlyPorts.Count -gt 0) {
+                if ($_.LocalAddress -in @('127.0.0.1','::1','0:0:0:0:0:0:0:1') -and $_.LocalPort -in $localOnlyPorts) {
+                    $keep = $false
+                }
+            }
             if ($keep) {
                 $pn = if ($_.ProcessName) { [System.IO.Path]::GetFileNameWithoutExtension($_.ProcessName) } else { '' }
                 foreach ($ep in $excludedProcs) {

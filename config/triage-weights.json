@@ -3,10 +3,13 @@
     "Connections": {
         "PrivateToPublicNonBrowser": 25,
         "ProcessInTempOrAppData":    30,
+        "NonStandardPort":           20,
+        "SuspiciousParentProcess":   50,
+        "PathOutsideSystem32":       40,
         "IOCMatchMultiplier":         2.0
     },
     "ListeningPorts": {
-        "HighPortNonServerProcess": 15,
+        "HighPortAllInterfaces":    15,
         "ListeningOnAllInterfaces": 10
     },
     "ScheduledTasks": {

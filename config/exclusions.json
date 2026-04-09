@@ -36,11 +36,5 @@
         "Sophos Ltd",
         "N-able Technologies, Inc."
     ],
-    "BeaconWhitelist": [
-        {
-            "Process": "svchost",
-            "RemotePort": 443,
-            "Reason": "Windows Update"
-        }
-    ]
+    "BeaconWhitelist": []
 }
