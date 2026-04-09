@@ -1,6 +1,6 @@
 ---
 name: config
-description: Config-file rules covering schema ownership, in-file documentation, the .env contract, and tactical-vs-strategic sync.
+description: Config-file rules covering schema ownership, in-file documentation, dead-config audit (fields loaded but never consulted), the .env contract, and tactical-vs-strategic sync.
 type: ai-subject
 ---
 
@@ -56,6 +56,21 @@ Rules for designing, naming, and documenting configuration files in this toolkit
 **Rule:** Either keep both in lockstep on every edit, or label the divergence inline. Silent divergence is the most common source of "the docs lied" rage in month 2.
 
 *Source: phase03_config_files.md#5*
+
+---
+
+## Dead Config Audit
+
+### Config fields not consulted by any unit are dead code
+
+**When:** Wiring up a new operator-vetting config field (suppression list, allowlist, signer-trust list, beacon whitelist, port whitelist).
+**Rule:** Audit *every other config field with the same operational shape* to confirm each is actually consulted by some unit. Same shape = same bug class. A field that's loaded by `U-LoadConfig` into `$script:Exclusions.X` and never read elsewhere is dead config — it ships with the repo, looks plausible, loads cleanly, and silently has zero effect. Phase 1.2 wired BeaconWhitelist while TrustedSigners (same shape, sitting next to it) sat dead the entire time, producing a OneDrive false-High on the first non-elevated dev-box run.
+
+Sister rule to `heuristics.md` "flags absent from the weights file are dead code" — same pathology, different surface (config field vs scoring flag). Both are silent failures that consume operator trust without contributing function.
+
+**Audit recipe:** grep for every `$script:Exclusions.X` (or equivalent loader-set property), confirm each is read by a unit body, delete or wire any that aren't.
+
+*Source: phase14_phase12_connection_enrichment_and_hotfix.md#1*
 
 ---
 

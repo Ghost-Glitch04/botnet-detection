@@ -7,9 +7,9 @@ Subject files group lessons-learned rules by primary topic so an AI assistant ca
 | [powershell.md](powershell.md) | 21 | strict-mode, scoping, dot-source, standalone-fallback, inline stubs, CIM/WMI perf, phase-gate error handling, library shape, bootstrap launcher, AST parsing, bash interop, smoke testing |
 | [docs.md](docs.md) | 17 | markdown link checking, surgical Edit vs Write, plan-vs-file reconciliation, strategic-vs-tactical scoping, module/feature tables, template semantics, operator experience, paste vs iwr\|iex, troubleshooting half-life |
 | [process.md](process.md) | 19 | pre-write Glob sweep, JSON/YAML validate-at-write, prior-phase re-verification, Windows Write over mkdir, .gitkeep vs README, lessons-learned cadence, diagnostic playbook (read transcript, one-sentence hypothesis, ground-truth tool, quantify, bounded substitution, discovery-as-regression-test, cross-class verify, scope expansion), peer-code as cross-domain learning vector, CF premise discipline |
-| [config.md](config.md) | 6 | per-module ownership, in-file Description, .env contract timing, tactical-extends-strategic sync, write-time validation |
+| [config.md](config.md) | 7 | per-module ownership, in-file Description, dead-config audit (loaded-but-unread fields), .env contract timing, tactical-extends-strategic sync, write-time validation |
 | [testing.md](testing.md) | 7 | multi-tier non-redundancy, mock-data realism, AST parse-check, standalone-paste isolation, fresh pwsh child, helper-stub guard invisibility, fixture privacy |
-| [heuristics.md](heuristics.md) | 9 | false-positive ceiling (>10%), dead-flag detection, threshold/floor math, cross-stage data-flow pitfalls, fallback concentration, enrichment channel selection (DNS over HTTPS-to-API), allowlist-vs-blocklist cardinality, fallback semantics (degraded vs different question), enrichment as observable footprint |
+| [heuristics.md](heuristics.md) | 9 | false-positive ceiling (>10%), dead-flag detection (absent vs weight=0 diagnostic-only), threshold/floor math, cross-stage data-flow pitfalls, fallback concentration, enrichment channel selection (DNS over HTTPS-to-API), allowlist-vs-blocklist cardinality, fallback semantics (degraded vs different question), enrichment as observable footprint |
 
 ## Concern Maps
 

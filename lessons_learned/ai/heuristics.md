@@ -1,6 +1,6 @@
 ---
 name: heuristics
-description: Detector and scoring rules — false-positive rate ceilings, dead-flag detection, threshold/floor consistency, cross-stage data-flow pitfalls, and enrichment-lookup design (allowlist vs blocklist, fallback semantics, operational footprint).
+description: Detector and scoring rules — false-positive rate ceilings, dead-flag detection (absent vs weight=0 diagnostic-only), threshold/floor consistency, cross-stage data-flow pitfalls, and enrichment-lookup design (allowlist vs blocklist, fallback semantics, operational footprint).
 type: ai-subject
 ---
 
@@ -21,12 +21,16 @@ Rules for designing detectors, scoring weights, and risk classifiers in this too
 
 ---
 
-### Flags not in the weights file are dead code with negative value
+### Flags absent from the weights file are dead code; weight=0 flags are diagnostic-only
 
-**When:** A detector emits a flag (e.g. `'SuspiciousArgs'`) that has no corresponding entry in `triage-weights.json`.
-**Rule:** Delete the emit code. The flag consumes operator attention column-space without influencing the verdict — strictly worse than not flagging. Either add the weight or delete the detector. Don't ship dead flags.
+**When:** A detector emits a flag and you're deciding whether it needs a weight in `triage-weights.json`.
+**Rule:** Two distinct categories with different rules.
+- **Absent from the weights file = dead code.** The flag consumes operator attention column-space without influencing the verdict. Delete the emit code or add a weight. Don't ship flags the weights file doesn't know about.
+- **Present with weight 0 = diagnostic-only flag, legitimate.** These exist to communicate signal *to the operator on a specific row* without affecting the *aggregate verdict* — e.g. `EnrichmentIncomplete` annotates rows where a NULL field tells the operator "this row's signal is partial." The flag must appear in the weights file (weight 0) so it isn't accidentally promoted to dead-code, and must never appear in scoring math.
 
-*Source: phase06_invoke_triage_build.md#3*
+The carve-out matters: an enrichment-failure annotation, a "fallback path used" marker, or a "non-elevated execution degraded this row" tag should not move the verdict, but should reach the operator. Diagnostic-only flags are how.
+
+*Source: phase06_invoke_triage_build.md#3, refined by phase14_phase12_connection_enrichment_and_hotfix.md#3*
 
 ---
 

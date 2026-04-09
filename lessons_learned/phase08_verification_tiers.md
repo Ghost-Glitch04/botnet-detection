@@ -183,7 +183,8 @@ The only permission-adjacent observation: `U-LocalAccounts` flagged 5 accounts d
 | 3   | Artifact schema inspection | PASS | manual | 4 top-level keys (meta/verdict/findings/errors), 8 finding sections, counts non-negative |
 | 4   | `git status --ignored --untracked-files=all` | PASS | <1s | All `output/`, deploy logs, mock IOCs properly ignored |
 | 5   | Standalone-paste (orphan file in `$env:TEMP`, fresh `pwsh -NoProfile` child) | PASS (after 1 fix) | 14s | configSource=inline-fallback confirmed, JSON written to temp |
-| 6   | Cross-host diff | DEFERRED | — | Single-host environment — not blocking Phase 1 |
+| 6   | **Non-elevated baseline** (added phase14) — real desktop with operator state, run as standard user | RETROACTIVELY ADDED | — | Excludes elevation-degradation bug class. See "Tier 6 — Non-Elevated Baseline" section below. |
+| 7   | Cross-host diff | DEFERRED | — | Single-host environment — not blocking Phase 1 |
 
 ---
 
@@ -197,3 +198,30 @@ The only permission-adjacent observation: `U-LocalAccounts` flagged 5 accounts d
 | 4 | Standalone-paste fails: `Invoke-PhaseGate` not defined | `Invoke-BotnetTriage.ps1` inline stub block | Add inline stubs for `Invoke-PhaseStart` and `Invoke-PhaseGate`; phase-gate stub uses `Get-Variable -Scope 1` defensive caller-param lookup |
 
 All four fixes were applied, AST-parse-checked, then re-tested by re-running the failing tier. No regressions surfaced in any earlier tier.
+
+---
+
+## Tier 6 — Non-Elevated Baseline (added phase14)
+
+**Why it exists:** Phase 1.2.1 caught three bugs (OneDrive false-High, quiet non-elevated UX, NULL fields shipping silently) that all required a non-elevated run on a real desktop with operator state to surface. The clean-VM tier (Tier 2) and the elevated dev-box tier (Tier 2 variants) were both administrator sessions; the non-elevated execution path *worked mechanically* (no exceptions, exit code 0, valid JSON) but degraded silently. Operator could not distinguish a partial-coverage run from an authoritative one.
+
+**Bug class excluded:** *Elevation-degradation* — code that runs cleanly under non-administrator permissions but produces misleading output. Distinct from data-path bugs (Tier 2), cross-stage bugs (Tier 2a), and standalone-paste bugs (Tier 5). No prior tier excluded this class.
+
+**Test environment requirements:**
+- Real desktop with operator state (OneDrive installed, browser running, scheduled tasks present, real DNS cache).
+- A clean VM is **insufficient** — it lacks the operational state where the bugs live. Both environments are needed; neither subsumes the other.
+- Run as a standard user (no `Run as Administrator`, no UAC elevation prompt).
+
+**Pass criteria:**
+1. Exit code 0.
+2. `meta.elevated` field present in JSON, typed as `false` (not string).
+3. Prominent `** NOT ELEVATED -- VISIBILITY LIMITED **` banner visible in console output (multi-line, yellow).
+4. Connection rows with `ProcessPath: null` or `CommandLine: null` carry the `EnrichmentIncomplete` flag.
+5. No `HIGH` findings on a binary that passes `TrustedSigners` (e.g., OneDrive). False-positive sanity check.
+6. `ParentProcessName` populated even when `ProcessPath` is null (parent-name lookup is admin-independent).
+
+**When to run:** Mandatory before declaring any phase shipped if that phase touched (a) connection enumeration, (b) process enrichment, (c) suppression / signer / vetting logic, or (d) anything that emits a row to JSON. Skip only for pure-doc or pure-test changes.
+
+**Why it can't be simulated:** The bug class is "the operator is misled," not "the code throws." A code-reading audit cannot find these bugs because the code is mechanically correct. Only a human-in-the-loop run on the degraded environment, followed by JSON inspection, surfaces them.
+
+*Source: phase14_phase12_connection_enrichment_and_hotfix.md#2*
