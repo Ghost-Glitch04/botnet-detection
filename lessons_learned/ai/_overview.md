@@ -6,7 +6,7 @@ Subject files group lessons-learned rules by primary topic so an AI assistant ca
 |------|-------|-------------------|
 | [powershell.md](powershell.md) | 21 | strict-mode, scoping, dot-source, standalone-fallback, inline stubs, CIM/WMI perf, phase-gate error handling, library shape, bootstrap launcher, AST parsing, bash interop, smoke testing |
 | [docs.md](docs.md) | 17 | markdown link checking, surgical Edit vs Write, plan-vs-file reconciliation, strategic-vs-tactical scoping, module/feature tables, template semantics, operator experience, paste vs iwr\|iex, troubleshooting half-life |
-| [process.md](process.md) | 7 | pre-write Glob sweep, JSON/YAML validate-at-write, prior-phase re-verification, Windows Write over mkdir, .gitkeep vs README, lessons-learned cadence |
+| [process.md](process.md) | 17 | pre-write Glob sweep, JSON/YAML validate-at-write, prior-phase re-verification, Windows Write over mkdir, .gitkeep vs README, lessons-learned cadence, diagnostic playbook (read transcript, one-sentence hypothesis, ground-truth tool, quantify, bounded substitution, discovery-as-regression-test, cross-class verify, scope expansion) |
 | [config.md](config.md) | 6 | per-module ownership, in-file Description, .env contract timing, tactical-extends-strategic sync, write-time validation |
 | [testing.md](testing.md) | 7 | multi-tier non-redundancy, mock-data realism, AST parse-check, standalone-paste isolation, fresh pwsh child, helper-stub guard invisibility, fixture privacy |
 | [heuristics.md](heuristics.md) | 5 | false-positive ceiling (>10%), dead-flag detection, threshold/floor math, cross-stage data-flow pitfalls, fallback concentration |

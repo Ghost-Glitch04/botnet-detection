@@ -212,12 +212,82 @@ Depends: $script:LogFile (path), $script:DebugMode (bool, optional)
 
 ## Bash Interop
 
-### Never cram multi-line pwsh into bash-quoted -Command
+### Never cram multi-line pwsh into bash-quoted -Command (FOUNDATION CANDIDATE)
 
-**When:** Calling PowerShell from a bash session for smoke testing (e.g. dot-source + run a function).
-**Rule:** Bash eats backticks and `$()` regardless of `$` escaping inside `pwsh -Command "..."`. Always write the snippet to a tempfile and use `pwsh -NoProfile -File /tmp/x.ps1`. Saves an hour of debugging "why is `$null` getting interpolated."
+**When:** Calling PowerShell from a bash session for smoke testing, file audits, or any cross-shell diagnostic (e.g. dot-source + run a function, regex over file paths).
+**Rule:** Bash eats backticks and `$()` regardless of `$` escaping inside `pwsh -Command "..."`. Bash also mangles backslash sequences inside double-quoted regex patterns (`\\\\output\\\\` becomes `\output\` which PS reads as an invalid escape). Always write the snippet to a tempfile (`Write` an `output/_tool.ps1`) and use `pwsh -NoProfile -File output/_tool.ps1`. Saves an hour of debugging "why is `$null` getting interpolated" or "why is my regex broken."
 
-*Source: phase05_shared_helpers.md#3*
+**Symptom:** `Invalid pattern '\output\' at offset 2. Unrecognized escape sequence \o.`
+**Re-applications:** phase05 (origin), phase11 (encoding diagnostic first attempt), phase12 (encoding diagnostic second attempt). Three independent contexts. Foundation-tier candidate.
+
+*Source: phase05_shared_helpers.md#3, re-applied phase11_ps51_encoding_fix.md, re-applied phase12_diagnostic_playbook.md#step5*
+
+---
+
+## Encoding & PowerShell 5.1
+
+### Always ship .ps1 files as ASCII or UTF-8-with-BOM (never UTF-8 without BOM)
+
+**When:** Authoring or editing any `.ps1`, `.psm1`, or `.psd1` file that may run under Windows PowerShell 5.1 (`powershell.exe`).
+**Rule:** PS 5.1 reads `.ps1` files as Windows-1252 by default unless they carry a UTF-8 BOM (`0xEF 0xBB 0xBF`). UTF-8 multi-byte sequences (em-dashes, smart quotes, arrows, ellipsis, box-drawings) get misread as garbage and corrupt parser state. The error manifests as cascading "Expressions are only allowed as the first element of a pipeline" + "Missing closing '}'" reported on lines that look unrelated. PS 7 (`pwsh.exe`) reads UTF-8 without BOM correctly, so dev-box testing on PS 7 hides the bug entirely. **Prefer ASCII** over UTF-8-with-BOM because BOM bytes survive paste-into-shell paths and look like cruft (`ï»¿`) in many terminals.
+
+**Companions:** standalone-fallback (paste path can't survive BOMs), testing (need a PS-5.1 verification tier)
+
+*Source: phase11_ps51_encoding_fix.md#1design + phase12_diagnostic_playbook.md*
+
+---
+
+### Recognize mojibake fingerprints in PowerShell error output
+
+**When:** Diagnosing a PowerShell parser/runtime error that includes weird character sequences in the cited code or error context.
+**Rule:** The following byte sequences are smoking guns for "UTF-8 bytes being read as Windows-1252" --- the moment you see one, the diagnosis is over:
+
+| Sequence | Decoded UTF-8 char | Codepoint |
+|----------|---------------------|-----------|
+| `â€"` | em-dash `--` | U+2014 |
+| `â€"` | en-dash `-` | U+2013 |
+| `â€œ` | left curly quote `"` | U+201C |
+| `â€` | right curly quote `"` | U+201D |
+| `â€™` | curly apostrophe `'` | U+2019 |
+| `â€¦` | ellipsis `...` | U+2026 |
+| `â†'` | right arrow `->` | U+2192 |
+| `Â ` | non-breaking space | U+00A0 |
+| `Â°` | degree sign `°` | U+00B0 |
+
+Skip the parser-error chase. Go directly to "what's the encoding of the file the parser is reading?"
+
+*Source: phase11_ps51_encoding_fix.md#1 + phase12_diagnostic_playbook.md#step2*
+
+---
+
+### Apply encoding fixes with [System.IO.File]::WriteAllBytes, never Set-Content
+
+**When:** Fixing an encoding bug in a `.ps1` (or any text file PS 5.1 will read).
+**Rule:** Use `[System.IO.File]::WriteAllBytes($path, $encoding.GetBytes($text))` --- never `Set-Content`, `Out-File`, or `$text | Out-File`. The Set-Content / Out-File cmdlets apply PowerShell's default encoding, which differs between PS 5.1, PS 7, and individual machine configurations. Using the same broken layer to write the fix is how you re-introduce the bug class. Read raw bytes via `[System.IO.File]::ReadAllBytes`, mutate as text via the explicit encoding, write raw bytes via `WriteAllBytes`. No PowerShell encoding negotiation anywhere in the pipeline.
+
+```powershell
+$text = [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8)
+# ... mutations ...
+$bytes = [System.Text.Encoding]::ASCII.GetBytes($text)
+[System.IO.File]::WriteAllBytes($path, $bytes)
+```
+
+*Source: phase11_ps51_encoding_fix.md + phase12_diagnostic_playbook.md#step8*
+
+---
+
+### Audit text files at the byte level, not via Get-Content
+
+**When:** Investigating whether a file has non-ASCII content, BOM presence, or encoding issues.
+**Rule:** `Get-Content` goes through PowerShell's text-decoding layer --- the same layer that may be the bug. Use `[System.IO.File]::ReadAllBytes($path)` to get a `byte[]` directly from disk. From there, count bytes >127 for non-ASCII, check the first three bytes for `0xEF 0xBB 0xBF` for UTF-8 BOM. The byte-level audit cannot lie about what is on disk because no encoding has been applied yet.
+
+```powershell
+$bytes = [System.IO.File]::ReadAllBytes($path)
+$hasBom = ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
+$nonAscii = ($bytes | Where-Object { $_ -gt 127 }).Count
+```
+
+*Source: phase11_ps51_encoding_fix.md + phase12_diagnostic_playbook.md#step4*
 
 ---
 

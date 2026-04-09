@@ -13,7 +13,7 @@ See [ai/_overview.md](ai/_overview.md) for the full file inventory and concern m
 |------|-------|-------------------|
 | [ai/powershell.md](ai/powershell.md) | 21 | strict-mode, scoping, dot-source, standalone-fallback, CIM/WMI perf, phase-gate error handling, library shape, bootstrap, AST parsing, bash interop |
 | [ai/docs.md](ai/docs.md) | 17 | link checking, surgical Edit, plan-vs-file reconciliation, strategic-vs-tactical scoping, template semantics, operator experience |
-| [ai/process.md](ai/process.md) | 7 | Glob sweep, validate-at-write, prior-phase re-verification, Windows tooling, .gitkeep vs README |
+| [ai/process.md](ai/process.md) | 17 | Glob sweep, validate-at-write, prior-phase re-verification, Windows tooling, .gitkeep vs README, diagnostic playbook (13-step), bug-fix reflection rules |
 | [ai/config.md](ai/config.md) | 6 | per-module ownership, in-file Description, .env contract timing, sync obligations |
 | [ai/testing.md](ai/testing.md) | 7 | multi-tier non-redundancy, mock realism, AST parse-check, fresh pwsh child, fixture privacy |
 | [ai/heuristics.md](ai/heuristics.md) | 5 | false-positive ceiling, dead-flag, threshold/floor math, cross-stage data-flow, fallback concentration |
@@ -115,6 +115,20 @@ note it in the current phase file.
 | powershell,verification,defensive | Round-trip equality checks compare original-after-substitution against bytes-decoded-back -- `Contains('?')` false-positives on legitimate `?` chars in source | phase11_ps51_encoding_fix.md#3pitfall | pitfall |
 | powershell,encoding,deployment | Prefer ASCII replacement over UTF-8 BOM for shipping .ps1 -- standalone-paste path can't survive BOM bytes; ASCII has zero failure modes across editors/tools/shells | phase11_ps51_encoding_fix.md#1design | design |
 | testing,git,privacy | One-shot diagnostic scripts live in gitignored `output/` -- generalizes phase08#2design (test fixtures) to one-shot tooling | phase11_ps51_encoding_fix.md#2design | design |
+| process,debugging,powershell | When PS reports cascading parser errors with "Missing closing '}'" trail, the cited line is always wrong -- the *first* point of confusion is closer to the bottom of the error output | phase12_diagnostic_playbook.md#step1 | went-well |
+| powershell,encoding,debugging | Mojibake fingerprints (`â€"`, `â†`, `Â`, `Ã`) name encoding bugs in <20 seconds -- skip the parser-error chase, go to the encoding fix | phase12_diagnostic_playbook.md#step2 | went-well |
+| process,debugging | Force the bug hypothesis into one sentence before writing diagnostic code -- if you cannot, you have a confused suspicion, not a hypothesis | phase12_diagnostic_playbook.md#step3 | went-well |
+| process,debugging,tools | When the bug is in tool X's display, you cannot diagnose it with tool X -- find a tool one layer below (raw bytes, raw packets, raw timing) | phase12_diagnostic_playbook.md#step4 | went-well |
+| process,debugging,bash | When a diagnostic command fails for quoting/escaping reasons, STOP -- the diagnostic environment is now compromised, switch invocation paths before continuing | phase12_diagnostic_playbook.md#step5 | went-well |
+| process,debugging,scoping | Quantify the bug surface (files, bytes, distinct values) before designing the fix -- numbers drive design; vibes do not | phase12_diagnostic_playbook.md#step6 | went-well |
+| process,refactoring | Bounded substitution maps over greedy strip-and-replace -- narrow fixes are reviewable, reversible, extensible; broad fixes hide future bugs | phase12_diagnostic_playbook.md#step7 | went-well |
+| powershell,encoding,fail-loud | Encoding-bug fixes must use writers that bypass encoding negotiation (`File::WriteAllBytes`) -- letting PS choose an encoding re-introduces the bug class | phase12_diagnostic_playbook.md#step8 | went-well |
+| process,verification,debugging | The discovery tool IS the first regression test -- if it still finds the bug after the fix, the fix is wrong; no other verification matters yet | phase12_diagnostic_playbook.md#step9 | went-well |
+| process,verification | Two verification passes that exercise the same code path are one verification pass -- each pass must exclude a *different* bug class or it is decoration | phase12_diagnostic_playbook.md#step10 | went-well |
+| process,debugging,scoping | When you find a bug, ask "what is the bug *class*, and where else could it manifest?" -- audit the surface in the same session, not next week | phase12_diagnostic_playbook.md#step12 | went-well |
+| lessons-learned,process | Bug-fix reflections must answer "what would have caught this?" -- if the answer is "none of our tests," that is a CF, not a footnote | phase12_diagnostic_playbook.md#step13 | went-well |
+| heuristics,scoring,false-positive | When detector top-N is dominated by identical findings on a clean baseline, fix the detector (allowlist) rather than the display (top-N dedup) -- dedup hides noise behind cosmetics | phase12_diagnostic_playbook.md#finding2 | pitfall |
+| lessons-learned,docs | Diagnostic playbooks captured as numbered steps (not bullets) -- the order encodes a dependency graph that prose flattens away | phase12_diagnostic_playbook.md#2design | design |
 
 ## Foundation
 
