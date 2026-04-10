@@ -247,7 +247,14 @@ function Invoke-BotnetTriage {
 
         [switch]$DryRun,
 
-        [switch]$DebugMode
+        [switch]$DebugMode,
+
+        # CF-34: Operator kill-switch for any unit that performs DNS/network
+        # enrichment lookups from the target endpoint. Enrichment lookups are
+        # an observable footprint — an operator running triage on a host they
+        # don't want to "touch the network from" can use this to guarantee
+        # the tool only reads local OS state. Default: network enrichment ON.
+        [switch]$NoNetworkLookups
     )
 
     # Wrap the entire function body so a -StopAfterPhase gate
@@ -456,6 +463,17 @@ function Invoke-BotnetTriage {
             $script:ConfigSource = 'file'
         }
         Write-Log -Level INFO -Message "CONFIG_RESOLVED: source=$($script:ConfigSource)"
+
+        # CF-34: publish the kill-switch decision as a script-scope flag so
+        # every enrichment unit reads from one place. The $NoNetworkLookups
+        # switch is inverted here ("enabled when switch absent") so unit
+        # code can read the positive form: `if ($script:NetworkLookupsEnabled)`
+        $script:NetworkLookupsEnabled = -not $NoNetworkLookups.IsPresent
+        if ($script:NetworkLookupsEnabled) {
+            Write-Log -Level INFO -Message "NETWORK_LOOKUPS_ENABLED: enrichment units will make DNS/network lookups"
+        } else {
+            Write-Log -Level INFO -Message "NETWORK_LOOKUPS_DISABLED: -NoNetworkLookups set, all enrichment lookups will be skipped"
+        }
     }
 
     # ---- U-LoadIOCs ----
@@ -525,7 +543,20 @@ function Invoke-BotnetTriage {
 
     # ---- U-ConnectionsSnapshot ----
     Invoke-TriageUnit -UnitName 'U-ConnectionsSnapshot' -Body {
+        # Top-level browser allowlist: process name alone is enough to suppress
+        # PrivateToPublicNonBrowser. These names are universally recognized as
+        # full browsers; an attacker using one of these names will trip other
+        # flags (ProcessInTempOrAppData, IOC match, NonStandardPort, ASN).
         $browserPattern = '^(chrome|firefox|msedge|iexplore|brave|opera|vivaldi|safari|edge)\.exe$'
+
+        # CF-33: Embedded-Chromium browser hosts (WebView2, CEF, etc.).
+        # These process names host UI for legitimate apps (Teams, Outlook new,
+        # VS Code's Markdown preview) but also present a bigger attack surface
+        # than a top-level browser because the hosting app controls the URL.
+        # Allowlist ONLY when the binary is signed by a TrustedSigner (Microsoft).
+        # A fake msedgewebview2.exe dropped by an attacker will fail this check
+        # and still fire PrivateToPublicNonBrowser.
+        $embeddedBrowserPattern = '^(msedgewebview2)\.exe$'
 
         # Processes whose canonical System32 path and expected parent are known.
         # A connection from one of these with the wrong parent or wrong path is a
@@ -560,6 +591,27 @@ function Invoke-BotnetTriage {
             $trustedSigners = @($script:Exclusions.TrustedSigners)
         }
 
+        # Lazy signer check: first call for a path pays the Authenticode cost
+        # (~50-200ms), subsequent calls hit the cache. Used by both the CF-33
+        # embedded-browser allowlist and the ProcessInTempOrAppData filter.
+        $testTrustedSigner = {
+            param([string]$Path)
+            if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+            if ($signerCache.ContainsKey($Path)) { return $signerCache[$Path] }
+            $ok = $false
+            try {
+                $sig = Get-AuthenticodeSignature -FilePath $Path -ErrorAction Stop
+                if ($sig.Status -eq 'Valid' -and $sig.SignerCertificate) {
+                    $subject = $sig.SignerCertificate.Subject
+                    foreach ($ts in $trustedSigners) {
+                        if ($subject -like "*$ts*") { $ok = $true; break }
+                    }
+                }
+            } catch { }
+            $signerCache[$Path] = $ok
+            return $ok
+        }
+
         $conns = Get-NetTCPConnection -State Established -ErrorAction Stop
         $results = @()
         foreach ($c in $conns) {
@@ -573,7 +625,19 @@ function Invoke-BotnetTriage {
 
             # ---- PrivateToPublicNonBrowser ----
             if (-not $remoteIsPrivate -and $localIsPrivate) {
-                if ($pd.Name -and $pd.Name -notmatch $browserPattern) {
+                $isBrowser = $false
+                if ($pd.Name) {
+                    if ($pd.Name -match $browserPattern) {
+                        $isBrowser = $true
+                    } elseif ($pd.Name -match $embeddedBrowserPattern) {
+                        # CF-33: embedded Chromium allowed only if signed.
+                        # Unsigned fakes still fire PrivateToPublicNonBrowser.
+                        if ($pd.Path -and (& $testTrustedSigner $pd.Path)) {
+                            $isBrowser = $true
+                        }
+                    }
+                }
+                if (-not $isBrowser) {
                     $flags += 'PrivateToPublicNonBrowser'
                 }
             }
@@ -585,22 +649,7 @@ function Invoke-BotnetTriage {
             # legitimately and would otherwise produce a false High on every
             # clean Windows host. (Bug found: phase 1.2.1 hotfix 2026-04-09)
             if ($pd.Path -and (Test-IsUserWritablePath $pd.Path)) {
-                $isTrustedSigner = $false
-                if ($signerCache.ContainsKey($pd.Path)) {
-                    $isTrustedSigner = $signerCache[$pd.Path]
-                } else {
-                    try {
-                        $sig = Get-AuthenticodeSignature -FilePath $pd.Path -ErrorAction Stop
-                        if ($sig.Status -eq 'Valid' -and $sig.SignerCertificate) {
-                            $subject = $sig.SignerCertificate.Subject
-                            foreach ($ts in $trustedSigners) {
-                                if ($subject -like "*$ts*") { $isTrustedSigner = $true; break }
-                            }
-                        }
-                    } catch {}
-                    $signerCache[$pd.Path] = $isTrustedSigner
-                }
-                if (-not $isTrustedSigner) {
+                if (-not (& $testTrustedSigner $pd.Path)) {
                     $flags += 'ProcessInTempOrAppData'
                 }
             }
@@ -1074,6 +1123,158 @@ function Invoke-BotnetTriage {
         })
 
         Write-Log -Level INFO -Message "EXCLUSIONS_APPLIED: connections $beforeConn->$($triageData.Connections.Count), listens $beforeList->$($triageData.ListeningPorts.Count), services $beforeSvc->$($triageData.Services.Count)"
+    }
+
+    # ---- U-EnrichConnectionsASN ----
+    # CF-31 + CF-34. Adds RemoteASN / RemoteASName / RemoteCountry / RemoteCIDR
+    # to every retained connection row by querying Team Cymru's public DNS
+    # ASN service (origin.asn.cymru.com + asn.cymru.com, TXT records only).
+    #
+    # Runs AFTER U-ApplyExclusions so suppressed rows don't burn DNS lookups.
+    # Runs BEFORE U-ScoreFindings and U-CorrelateIOCs so those units could
+    # (in a later phase) key off ASN/country — today they do not, but the
+    # data is in place.
+    #
+    # Operator kill-switch: -NoNetworkLookups (CF-34). When set, the unit
+    # short-circuits and every row gets a RemoteASN=$null field so downstream
+    # code sees a uniform shape.
+    #
+    # Per-run IP cache: a typical triage has 5-20 unique remote IPs across
+    # dozens of connections (one browser resolves many TCP sessions to the
+    # same CDN endpoint). Cache eliminates redundant DNS work.
+    Invoke-TriageUnit -UnitName 'U-EnrichConnectionsASN' -Body {
+        if (-not $triageData.Connections -or $triageData.Connections.Count -eq 0) {
+            Write-Log -Level INFO -Message "ASN_ENRICH_SKIPPED: no connection rows to enrich"
+            return
+        }
+
+        if (-not $script:NetworkLookupsEnabled) {
+            # Kill-switch path: add null enrichment fields so the output shape
+            # is stable whether enrichment ran or not. Downstream consumers
+            # (Output phase, operator readers) can count on the field names.
+            foreach ($row in $triageData.Connections) {
+                Add-Member -InputObject $row -MemberType NoteProperty -Name 'RemoteASN'     -Value $null -Force
+                Add-Member -InputObject $row -MemberType NoteProperty -Name 'RemoteASName'  -Value $null -Force
+                Add-Member -InputObject $row -MemberType NoteProperty -Name 'RemoteCountry' -Value $null -Force
+                Add-Member -InputObject $row -MemberType NoteProperty -Name 'RemoteCIDR'    -Value $null -Force
+            }
+            Write-Log -Level INFO -Message "ASN_ENRICH_SKIPPED: -NoNetworkLookups set, $($triageData.Connections.Count) row(s) left un-enriched"
+            return
+        }
+
+        # Skip enrichment for non-public addresses. Cymru only answers for
+        # globally-routable addresses; RFC1918/loopback/link-local/CGNAT/multicast
+        # lookups return nothing and waste time.
+        $skipEnrich = {
+            param([string]$ip)
+            if ([string]::IsNullOrWhiteSpace($ip)) { return $true }
+            # IPv6 shortcuts
+            if ($ip -eq '::1') { return $true }
+            if ($ip.StartsWith('fe80:')) { return $true }  # link-local
+            if ($ip.StartsWith('fc') -or $ip.StartsWith('fd')) { return $true }  # ULA
+            if ($ip -notmatch '^\d+\.\d+\.\d+\.\d+$') { return $true }  # IPv6 or malformed — skip for now, Cymru IPv6 is a future extension
+            $o = $ip.Split('.')
+            if ($o.Count -ne 4) { return $true }
+            $a = [int]$o[0]; $b = [int]$o[1]
+            if ($a -eq 10) { return $true }                                      # 10.0.0.0/8
+            if ($a -eq 127) { return $true }                                     # 127.0.0.0/8
+            if ($a -eq 172 -and $b -ge 16 -and $b -le 31) { return $true }       # 172.16.0.0/12
+            if ($a -eq 192 -and $b -eq 168) { return $true }                     # 192.168.0.0/16
+            if ($a -eq 169 -and $b -eq 254) { return $true }                     # 169.254.0.0/16 link-local
+            if ($a -eq 100 -and $b -ge 64 -and $b -le 127) { return $true }      # 100.64.0.0/10 CGNAT
+            if ($a -ge 224) { return $true }                                     # multicast + reserved
+            if ($a -eq 0) { return $true }                                       # 0.0.0.0/8
+            return $false
+        }
+
+        # Per-run cache: IP -> PSCustomObject { ASN, ASName, Country, CIDR }
+        # A cache miss means "resolve now"; a cache entry with null ASN means
+        # "already tried, DNS had no answer, don't retry".
+        $asnCache = @{}
+
+        $resolveOne = {
+            param([string]$ip)
+            try {
+                $parts = $ip.Split('.')
+                [array]::Reverse($parts)
+                $originQuery = ($parts -join '.') + '.origin.asn.cymru.com'
+                $txt = Resolve-DnsName -Name $originQuery -Type TXT -DnsOnly -QuickTimeout -ErrorAction Stop
+                $rec = $txt | Where-Object { $_.Type -eq 'TXT' } | Select-Object -First 1
+                if (-not $rec) { return $null }
+                $raw = ($rec.Strings -join '')
+                $f = $raw.Split('|') | ForEach-Object { $_.Trim() }
+                if ($f.Count -lt 5) { return $null }
+                # Multi-origin case: "15169 36040" -- take the first ASN.
+                $asn     = $f[0].Split(' ')[0]
+                $cidr    = $f[1]
+                $country = $f[2]
+
+                # Second hop: ASN -> AS-Name. Failure here is non-fatal --
+                # we still return a partial record so the operator sees ASN+CC.
+                $asname = $null
+                try {
+                    $asnTxt = Resolve-DnsName -Name ("AS$asn.asn.cymru.com") -Type TXT -DnsOnly -QuickTimeout -ErrorAction Stop
+                    $asnRec = $asnTxt | Where-Object { $_.Type -eq 'TXT' } | Select-Object -First 1
+                    if ($asnRec) {
+                        $asnRaw = ($asnRec.Strings -join '')
+                        $af = $asnRaw.Split('|') | ForEach-Object { $_.Trim() }
+                        if ($af.Count -ge 5) { $asname = $af[4] }
+                    }
+                } catch { }  # AS-Name lookup failures are silent -- partial record still useful
+
+                return [pscustomobject]@{
+                    ASN     = $asn
+                    ASName  = $asname
+                    Country = $country
+                    CIDR    = $cidr
+                }
+            } catch {
+                return $null
+            }
+        }
+
+        $lookedUp   = 0
+        $cacheHits  = 0
+        $skipped    = 0
+        $resolved   = 0
+        $unresolved = 0
+
+        foreach ($row in $triageData.Connections) {
+            $ip = [string]$row.RemoteAddress
+
+            if (& $skipEnrich $ip) {
+                Add-Member -InputObject $row -MemberType NoteProperty -Name 'RemoteASN'     -Value $null -Force
+                Add-Member -InputObject $row -MemberType NoteProperty -Name 'RemoteASName'  -Value $null -Force
+                Add-Member -InputObject $row -MemberType NoteProperty -Name 'RemoteCountry' -Value $null -Force
+                Add-Member -InputObject $row -MemberType NoteProperty -Name 'RemoteCIDR'    -Value $null -Force
+                $skipped++
+                continue
+            }
+
+            if ($asnCache.ContainsKey($ip)) {
+                $cacheHits++
+                $entry = $asnCache[$ip]
+            } else {
+                $lookedUp++
+                $entry = & $resolveOne $ip
+                $asnCache[$ip] = $entry  # null entries count as "tried, no answer"
+                if ($entry) { $resolved++ } else { $unresolved++ }
+            }
+
+            if ($entry) {
+                Add-Member -InputObject $row -MemberType NoteProperty -Name 'RemoteASN'     -Value $entry.ASN     -Force
+                Add-Member -InputObject $row -MemberType NoteProperty -Name 'RemoteASName'  -Value $entry.ASName  -Force
+                Add-Member -InputObject $row -MemberType NoteProperty -Name 'RemoteCountry' -Value $entry.Country -Force
+                Add-Member -InputObject $row -MemberType NoteProperty -Name 'RemoteCIDR'    -Value $entry.CIDR    -Force
+            } else {
+                Add-Member -InputObject $row -MemberType NoteProperty -Name 'RemoteASN'     -Value $null -Force
+                Add-Member -InputObject $row -MemberType NoteProperty -Name 'RemoteASName'  -Value $null -Force
+                Add-Member -InputObject $row -MemberType NoteProperty -Name 'RemoteCountry' -Value $null -Force
+                Add-Member -InputObject $row -MemberType NoteProperty -Name 'RemoteCIDR'    -Value $null -Force
+            }
+        }
+
+        Write-Log -Level INFO -Message "ASN_ENRICH_COMPLETE: rows=$($triageData.Connections.Count) skipped=$skipped lookups=$lookedUp cache_hits=$cacheHits resolved=$resolved unresolved=$unresolved unique_ips=$($asnCache.Count)"
     }
 
     # ---- U-ScoreFindings ----
