@@ -1,12 +1,29 @@
 ---
 name: process
-description: Process rules covering pre-write verification sweeps, scaffold/bootstrap discipline, and the lessons-learned cadence itself.
+description: Process rules covering pre-write verification sweeps, scaffold/bootstrap discipline, proof-of-concept-first feature development, and the lessons-learned cadence itself.
 type: ai-subject
 ---
 
 # Process — Subject Rules
 
 Rules for *how* to work, not *what* to build. Anchor topics: verify-before-write sweeps, tool selection on Windows, scaffolding hygiene, and the lessons-learned discipline.
+
+---
+
+## Feature Development Order
+
+### Proof of concept before full implementation
+
+**When:** Starting any new feature — enrichment unit, detection flag, data source integration, scoring change, external API call.
+**Rule:** Build the minimal version that proves the methodology works (or fails fast) *before* investing in error handling, config integration, logging, weights, and edge cases. A working 30-line PoC that confirms Cymru DNS resolves correctly in PowerShell is worth more than a 300-line production unit built on an assumption that turns out to be wrong. PoC criteria: the core mechanic executes end-to-end and returns a meaningful result on real data.
+
+**PoC is not the same as a stub.** A stub returns a hardcoded value. A PoC hits the real data source / real API / real file path and returns real output. The PoC is the first regression test for the feature's fundamental feasibility.
+
+**When the PoC passes:** add the production layer incrementally — logging, fallback, config wiring, weights entry, Tier 2 real-run verification. Each layer is a separate commit. The PoC result is the anchor: if a later layer breaks the core behavior, the PoC re-run exposes it immediately.
+
+**When the PoC fails:** treat failure as early success — you learned the approach is wrong before building the full feature. Pivot the design before the investment compounds.
+
+*Source: operator guideline 2026-04-10*
 
 ---
 

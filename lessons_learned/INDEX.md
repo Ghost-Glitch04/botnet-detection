@@ -13,7 +13,7 @@ See [ai/_overview.md](ai/_overview.md) for the full file inventory and concern m
 |------|-------|-------------------|
 | [ai/powershell.md](ai/powershell.md) | 21 | strict-mode, scoping, dot-source, standalone-fallback, CIM/WMI perf, phase-gate error handling, library shape, bootstrap, AST parsing, bash interop |
 | [ai/docs.md](ai/docs.md) | 17 | link checking, surgical Edit, plan-vs-file reconciliation, strategic-vs-tactical scoping, template semantics, operator experience |
-| [ai/process.md](ai/process.md) | 19 | Glob sweep, validate-at-write, prior-phase re-verification, Windows tooling, .gitkeep vs README, diagnostic playbook (13-step), bug-fix reflection rules, peer-code as learning vector, CF premise discipline |
+| [ai/process.md](ai/process.md) | 20 | Glob sweep, validate-at-write, prior-phase re-verification, Windows tooling, .gitkeep vs README, diagnostic playbook (13-step), bug-fix reflection rules, peer-code as learning vector, CF premise discipline, proof-of-concept-first development |
 | [ai/config.md](ai/config.md) | 7 | per-module ownership, in-file Description, dead-config audit (loaded-but-unread fields), .env contract timing, sync obligations |
 | [ai/testing.md](ai/testing.md) | 7 | multi-tier non-redundancy, mock realism, AST parse-check, fresh pwsh child, fixture privacy |
 | [ai/heuristics.md](ai/heuristics.md) | 9 | false-positive ceiling, dead-flag (absent vs weight=0 diagnostic-only), threshold/floor math, cross-stage data-flow, fallback concentration, enrichment channel selection (DNS over HTTPS), allowlist-vs-blocklist, fallback semantics, operational footprint |
@@ -27,7 +27,7 @@ powershell, forensics, botnet, triage, beacon, ioc, config, secrets,
 error-handling, logging, testing, security, git, deploy, network,
 process, remote-shell, standalone-fallback, scaffolding, docs,
 enrichment, asn, dns, external-knowledge, operational-footprint,
-elevation, dead-code, diagnostic-flags, signer-cache
+elevation, dead-code, diagnostic-flags, signer-cache, poc-first
 ```
 
 Tags are lowercase, hyphenated compounds, 1–3 per entry with primary tag first.
@@ -137,12 +137,15 @@ note it in the current phase file.
 | enrichment,operational-footprint,security | A detection tool's enrichment lookups are part of the tool's observable footprint *on the target* -- document them, provide a `-NoNetworkLookups` kill-switch, make stealth-vs-quality the operator's choice | phase13_external_pattern_borrow.md#finding4 | design |
 | process,external-knowledge,lessons-learned | Read peer code from adjacent forensics/security domains for techniques even when use cases differ -- trade knowledge is invisible to general docs but visible in working code from practitioners | phase13_external_pattern_borrow.md#finding5 | went-well |
 | process,lessons-learned,planning | Carry-forwards must record their *premise*, not just their deferral -- "Phase 2 because needs offline DB" is reviewable; "Phase 2" is opaque and outlives its premise silently | phase13_external_pattern_borrow.md#finding6 | pitfall |
+| process,planning,docs | Ghost CFs (referenced but never formally defined in a committed file) are invisible to premise audits -- every CF must have a committed definition with Title/Surface/Action/Premise or it doesn't exist | phase15_cf35_premise_audit.md#finding1 | pitfall |
+| process,planning | CF clusters that share a premise (CF-21/23/24/30 graduation, CF-16/19 scoring) must be treated as a single atomic task -- fixing one without the others risks inconsistency | phase15_cf35_premise_audit.md#finding6 | design |
 | config,dead-code,suppression | Config fields loaded by U-LoadConfig but never read by any unit are dead code with the same negative value as dead flags -- TrustedSigners sat dead next to BeaconWhitelist for an entire phase | phase14_phase12_connection_enrichment_and_hotfix.md#1 | pitfall |
 | testing,verification,elevation,multi-tier | Tier 6 (non-elevated baseline on a real desktop) is mandatory -- excludes the elevation-degradation bug class; clean VMs and admin sessions cannot substitute | phase14_phase12_connection_enrichment_and_hotfix.md#2 | went-well |
 | heuristics,scoring,diagnostic-flags | Dead-flag rule has a carve-out: *absent* from weights file = dead; *present with weight 0* = diagnostic-only flag, legitimate, never appears in scoring math | phase14_phase12_connection_enrichment_and_hotfix.md#3 | design |
 | powershell,performance,signer-cache | Path-keyed per-invocation Get-AuthenticodeSignature cache -- generalizes phase06#2 (per-row CIM is a perf bug) to any expensive lookup with a stable key. Per-invocation, not persistent (signer state can change) | phase14_phase12_connection_enrichment_and_hotfix.md#went-well-2 | design |
 | testing,verification,elevation | Elevation-degradation is its own bug class -- mechanically-correct code under non-admin permissions can still mislead the operator. Code-reading audits cannot find these; only a degraded-environment run can | phase14_phase12_connection_enrichment_and_hotfix.md#2 | pitfall |
 | powershell,permissions,observation | Non-elevated Get-NetTCPConnection enumerates SYSTEM-owned connections fine; only the downstream Win32_Process enrichment (ExecutablePath, CommandLine) degrades. ParentProcessName survives non-elevation | phase14_phase12_connection_enrichment_and_hotfix.md#observations | went-well |
+| process,poc-first,development | Build the minimal testable version that proves the methodology before investing in error handling, config integration, logging, and edge cases -- PoC failure is early success (pivot before the investment compounds) | ai/process.md#poc-first | design |
 
 ## Foundation
 
