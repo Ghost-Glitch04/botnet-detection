@@ -1198,7 +1198,7 @@ function Invoke-BotnetTriage {
                 $parts = $ip.Split('.')
                 [array]::Reverse($parts)
                 $originQuery = ($parts -join '.') + '.origin.asn.cymru.com'
-                $txt = Resolve-DnsName -Name $originQuery -Type TXT -DnsOnly -QuickTimeout -ErrorAction Stop
+                $txt = Resolve-DnsName -Name $originQuery -Type TXT -DnsOnly -ErrorAction Stop
                 $rec = $txt | Where-Object { $_.Type -eq 'TXT' } | Select-Object -First 1
                 if (-not $rec) { return $null }
                 $raw = ($rec.Strings -join '')
@@ -1213,7 +1213,7 @@ function Invoke-BotnetTriage {
                 # we still return a partial record so the operator sees ASN+CC.
                 $asname = $null
                 try {
-                    $asnTxt = Resolve-DnsName -Name ("AS$asn.asn.cymru.com") -Type TXT -DnsOnly -QuickTimeout -ErrorAction Stop
+                    $asnTxt = Resolve-DnsName -Name ("AS$asn.asn.cymru.com") -Type TXT -DnsOnly -ErrorAction Stop
                     $asnRec = $asnTxt | Where-Object { $_.Type -eq 'TXT' } | Select-Object -First 1
                     if ($asnRec) {
                         $asnRaw = ($asnRec.Strings -join '')
@@ -1229,6 +1229,7 @@ function Invoke-BotnetTriage {
                     CIDR    = $cidr
                 }
             } catch {
+                Write-Log -Level DEBUG -Message "ASN_DNS_FAIL: ip=$ip err=$($_.Exception.Message)"
                 return $null
             }
         }
